@@ -109,6 +109,17 @@ describe('Cache Service', () => {
         const v3 = await getNamespaceVersion('test-ns');
         expect(v3).toBe(2);
     });
+
+    it('immediately observes namespace version bumps from other serverless instances without stale in-memory TTL', async () => {
+        const v1 = await getNamespaceVersion('events');
+        expect(v1).toBe(1);
+
+        // Simulate another warm serverless instance bumping the Redis key directly
+        mockStore.set('cache:version:events', '5');
+
+        const vAfterRemoteBump = await getNamespaceVersion('events');
+        expect(vAfterRemoteBump).toBe(5);
+    });
 });
 
 describe('Better Auth Secondary Storage', () => {

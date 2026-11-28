@@ -40,10 +40,19 @@ export const cacheKeys = {
  * Invalidate all cached data for one or more events, and invalidate kiosk views and event lists.
  */
 export async function invalidateEvent(eventIds?: string | string[]): Promise<void> {
-    const ids = eventIds ? (Array.isArray(eventIds) ? eventIds : [eventIds]) : [];
+    const rawIds = eventIds ? (Array.isArray(eventIds) ? eventIds : [eventIds]) : [];
+    const idSet = new Set<string>();
+    for (const id of rawIds) {
+        if (!id) continue;
+        idSet.add(id);
+        if (id.includes('_inst_')) {
+            const masterId = id.split('_inst_')[0];
+            if (masterId) idSet.add(masterId);
+        }
+    }
 
     const keys: string[] = [];
-    for (const id of ids) {
+    for (const id of idSet) {
         keys.push(
             cacheKeys.publicEvent(id),
             cacheKeys.eventQr(id),

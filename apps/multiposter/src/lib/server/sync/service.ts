@@ -1380,6 +1380,7 @@ export class SyncService {
 						await db.update(campaignTable).set({ content: cContent, updatedAt: new Date() }).where(eq(campaignTable.id, campWithExtId.id));
 					}
 				}
+				await invalidateEvent(mappedEventId);
 				await publishEventChange('update', [mappedEventId]);
 			}
 			return;
@@ -1429,6 +1430,7 @@ export class SyncService {
 				}
 			}
 
+			await invalidateEvent(mappedEventId);
 			await publishEventChange('update', [mappedEventId]);
 
 			// Update event contacts status
@@ -1573,8 +1575,8 @@ export class SyncService {
 			// Generate assets for the new event
 			await import('#lib/server/events/assets.js').then((m) => m.generateEventAssets(newEvent.id));
 
-			await publishEventChange('create', [newEvent.id]);
 			await invalidateEvent(newEvent.id);
+			await publishEventChange('create', [newEvent.id]);
 
 			// Update event contacts associations and their status
 			if (externalEvent.attendees) {

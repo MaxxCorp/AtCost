@@ -1,28 +1,26 @@
+import { getRequestEvent } from '$app/server';
 import { getRedisClient, isCircuitOpen, recordFailure, recordSuccess } from './redis';
 
-// Short in-memory cache for namespace versions to avoid redundant Redis roundtrips
-const memVersionCache = new Map<string, { version: number; expiresAt: number }>();
-const MEM_VERSION_TTL_MS = 5000; // 5 seconds
+// Deduplicate namespace version lookups strictly within a single HTTP request.
+// Cross-request module-global caching is unsafe on Vercel serverless because
+// separate warm instances cannot invalidate each other's in-memory TTL caches.
+const requestVersionCache = new WeakMap<Request, Map<string, Promise<number>>>();
 
-function getMemVersion(namespace: string): number | null {
-    const entry = memVersionCache.get(namespace);
-    if (!entry) return null;
-    if (Date.now() > entry.expiresAt) {
-        memVersionCache.delete(namespace);
+function getCurrentRequest(): Request | null {
+    try {
+        return getRequestEvent()?.request ?? null;
+    } catch {
         return null;
     }
-    return entry.version;
 }
 
-function setMemVersion(namespace: string, version: number): void {
-    memVersionCache.set(namespace, {
-        version,
-        expiresAt: Date.now() + MEM_VERSION_TTL_MS
-    });
-}
-
-function clearMemVersion(namespace: string): void {
-    memVersionCache.delete(namespace);
+function getRequestNamespaceMap(req: Request): Map<string, Promise<number>> {
+    let map = requestVersionCache.get(req);
+    if (!map) {
+        map = new Map();
+        requestVersionCache.set(req, map);
+    }
+    return map;
 }
 
 /**
@@ -177,24 +175,35 @@ export async function cachedBinary(
  * Defaults to 1 if not set or Redis is unavailable.
  */
 export async function getNamespaceVersion(namespace: string): Promise<number> {
-    const cachedVer = getMemVersion(namespace);
-    if (cachedVer !== null) return cachedVer;
-
-    const client = getRedisClient();
-    if (!client || isCircuitOpen()) return 1;
-
-    try {
-        const key = `cache:version:${namespace}`;
-        const raw = await client.get(key);
-        const ver = raw ? parseInt(raw, 10) : 1;
-        const finalVer = isNaN(ver) || ver < 1 ? 1 : ver;
-        setMemVersion(namespace, finalVer);
-        recordSuccess();
-        return finalVer;
-    } catch (err) {
-        recordFailure(err);
-        return 1;
+    const req = getCurrentRequest();
+    if (req) {
+        const reqMap = getRequestNamespaceMap(req);
+        const existing = reqMap.get(namespace);
+        if (existing) return existing;
     }
+
+    const fetchVersion = async (): Promise<number> => {
+        const client = getRedisClient();
+        if (!client || isCircuitOpen()) return 1;
+
+        try {
+            const key = `cache:version:${namespace}`;
+            const raw = await client.get(key);
+            const ver = raw ? parseInt(raw, 10) : 1;
+            const finalVer = isNaN(ver) || ver < 1 ? 1 : ver;
+            recordSuccess();
+            return finalVer;
+        } catch (err) {
+            recordFailure(err);
+            return 1;
+        }
+    };
+
+    const promise = fetchVersion();
+    if (req) {
+        getRequestNamespaceMap(req).set(namespace, promise);
+    }
+    return promise;
 }
 
 /**
@@ -202,17 +211,23 @@ export async function getNamespaceVersion(namespace: string): Promise<number> {
  * This instantly invalidates all versioned cache keys in this namespace in O(1) time.
  */
 export async function bumpNamespaceVersion(namespace: string): Promise<number> {
-    clearMemVersion(namespace);
+    const req = getCurrentRequest();
     const client = getRedisClient();
-    if (!client || isCircuitOpen()) return 1;
+    if (!client || isCircuitOpen()) {
+        if (req) getRequestNamespaceMap(req).delete(namespace);
+        return 1;
+    }
 
     try {
         const key = `cache:version:${namespace}`;
         const nextVer = await client.incr(key);
-        setMemVersion(namespace, nextVer);
+        if (req) {
+            getRequestNamespaceMap(req).set(namespace, Promise.resolve(nextVer));
+        }
         recordSuccess();
         return nextVer;
     } catch (err) {
+        if (req) getRequestNamespaceMap(req).delete(namespace);
         recordFailure(err);
         return 1;
     }

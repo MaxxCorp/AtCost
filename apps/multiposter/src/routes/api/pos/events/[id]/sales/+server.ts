@@ -8,6 +8,7 @@ import {
 	removeEventSaleRecord
 } from '#lib/server/events/sales.js';
 import { posCorsHeaders } from '#lib/server/pos/openapi.js';
+import { commitEventChange } from '#lib/server/events/sync-commit.js';
 
 export const OPTIONS: RequestHandler = async () => {
 	return new Response(null, { status: 204, headers: posCorsHeaders });
@@ -50,6 +51,10 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		}
 
 		const result = await recordEventSales(parsed.output);
+		await commitEventChange({
+			action: 'update',
+			ids: [params.id]
+		});
 		return json(result, { headers: posCorsHeaders });
 	} catch (err: any) {
 		const status = err?.message === 'Event not found' ? 404 : 400;
@@ -74,6 +79,10 @@ export const DELETE: RequestHandler = async ({ params, url }) => {
 			eventId: params.id,
 			saleId,
 			restoreInventory
+		});
+		await commitEventChange({
+			action: 'update',
+			ids: [params.id]
 		});
 		return json(result, { headers: posCorsHeaders });
 	} catch (err: any) {

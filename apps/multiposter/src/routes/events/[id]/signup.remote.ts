@@ -23,9 +23,8 @@ import { findMatchingContacts } from '#lib/server/contact-matching.js';
 import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
 import { applyEventParticipantsDelta } from '#lib/server/events/participants.js';
 import { getContactHeadcount } from '#lib/utils/participants.js';
-import { invalidateEvent, invalidateContact } from '#lib/server/cache/index.js';
-import { readEvent } from './read.remote.js';
-import { listEvents } from '../list.remote.js';
+import { invalidateContact } from '#lib/server/cache/index.js';
+import { commitEventChange } from '#lib/server/events/sync-commit.js';
 import { fetchEntityContacts } from '../../contacts/associate.remote.js';
 import { listContacts } from '../../contacts/list.remote.js';
 
@@ -50,31 +49,26 @@ async function getEventLocationIds(client: any, targetEventId: string): Promise<
 }
 
 async function refreshEventAndContactQueries(eventId: string, targetEventId: string) {
-	await invalidateEvent(eventId);
-	if (targetEventId !== eventId) {
-		await invalidateEvent(targetEventId);
-	}
-	void readEvent(eventId).refresh();
-	if (targetEventId !== eventId) {
-		void readEvent(targetEventId).refresh();
-	}
-	try {
-		await requested(fetchEntityContacts, 20).refreshAll();
-	} catch { /* ignore */ }
-	void fetchEntityContacts({ type: 'event', entityId: eventId }).refresh();
-	if (targetEventId !== eventId) {
-		void fetchEntityContacts({ type: 'event', entityId: targetEventId }).refresh();
-	}
-	try {
-		await requested(listContacts, 20).refreshAll();
-	} catch { /* ignore */ }
-	void listContacts().refresh();
-	void listContacts({}).refresh();
-	try {
-		await requested(listEvents, 20).refreshAll();
-	} catch { /* ignore */ }
-	void listEvents().refresh();
-	void listEvents({}).refresh();
+	const user = getOptionalUser();
+	await commitEventChange({
+		action: 'update',
+		ids: [eventId, targetEventId],
+		user: user ?? undefined,
+		extraRefresh: async () => {
+			try {
+				await requested(fetchEntityContacts, 20).refreshAll();
+			} catch { /* ignore */ }
+			void fetchEntityContacts({ type: 'event', entityId: eventId }).refresh();
+			if (targetEventId !== eventId) {
+				void fetchEntityContacts({ type: 'event', entityId: targetEventId }).refresh();
+			}
+			try {
+				await requested(listContacts, 20).refreshAll();
+			} catch { /* ignore */ }
+			void listContacts().refresh();
+			void listContacts({}).refresh();
+		}
+	});
 }
 
 async function loadTargetEvent(eventId: string, materializeIfVirtual: boolean) {

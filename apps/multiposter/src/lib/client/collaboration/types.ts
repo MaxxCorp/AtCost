@@ -24,12 +24,14 @@ export interface Collaborator extends CollaboratorPresenceData {
 export interface EntityChangeMessage {
     entityType: string;
     id: string;
+    ids?: string[];
     action: 'create' | 'update' | 'delete';
     updatedBy?: {
         id: string;
         name?: string;
         email?: string;
     };
+    originTabId?: string;
     timestamp: number;
     fields?: Record<string, any>;
 }

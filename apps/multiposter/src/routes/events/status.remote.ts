@@ -1,12 +1,9 @@
-import { command, requested } from '$app/server';
+import { command } from '$app/server';
 import { db, event, eventLocation, eventResource, eventContact, eventContactRole, eventTag, eventPrice, campaign } from '@ac/db';
 import { inArray, eq, and, or, sql } from '@ac/db';
-import { listEvents } from './list.remote';
-import { readEvent } from './[id]/read.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { syncService } from '#lib/server/sync/service.js';
-import { publishEventChange } from '#lib/server/realtime.js';
-import { invalidateEvent } from '#lib/server/cache/index.js';
+import { commitEventChange } from '#lib/server/events/sync-commit.js';
 import { computeOccurrenceSignUpClosureDate } from '#lib/server/events/recurrence.js';
 import { updateEventsStatusSchema } from '#lib/validations/events.js';
 import type { CampaignContent } from '@ac/validations';
@@ -223,29 +220,17 @@ export const updateEventsStatus = command(
 			}
 		}
 
-		if (affectedEventIds.length > 0) {
-			await invalidateEvent(affectedEventIds);
-			await publishEventChange('update', affectedEventIds).catch(console.error);
-		}
-
 		const syncTargets = [...new Set([...affectedEventIds, ...affectedMasterIds])];
 		for (const targetId of syncTargets) {
 			await syncService.syncItems(user.id, [targetId], 'event').catch(console.error);
 		}
 
-		try {
-			await requested(listEvents, 20).refreshAll();
-		} catch (e) {
-			console.warn('[updateEventsStatus] requested refresh warning:', e);
-		}
-		try {
-			await requested(readEvent, 20).refreshAll();
-		} catch { /* ignore */ }
-		for (const id of [...new Set([...affectedEventIds, ...ids])]) {
-			void readEvent(id).refresh();
-		}
-		void listEvents().refresh();
-		void listEvents({}).refresh();
+		await commitEventChange({
+			action: 'update',
+			ids: [...affectedEventIds, ...ids],
+			masterIds: affectedMasterIds,
+			user
+		});
 
 		return { success: true, count: affectedEventIds.length };
 	}

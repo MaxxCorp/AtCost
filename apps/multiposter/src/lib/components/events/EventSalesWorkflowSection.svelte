@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
+	import { markLocalEntityMutation } from '@ac/ui';
 	import {
 		ShoppingCart,
 		TrendingUp,
@@ -41,6 +42,8 @@
 		isPriceListScanAvailable,
 		scanPriceListTallies
 	} from '../../../routes/prices/sales.remote';
+	import { readEvent, readEventLive } from '../../../routes/events/[id]/read.remote';
+	import { listEvents, listEventsLive } from '../../../routes/events/list.remote';
 
 	let {
 		eventId,
@@ -246,6 +249,7 @@
 
 		isRecordingSales = true;
 		try {
+			markLocalEntityMutation('event', [eventId]);
 			await recordSalesCommand({
 				eventId,
 				retrievalMode,
@@ -254,8 +258,7 @@
 				source: 'manual',
 				notes: saleNotes.trim() || undefined,
 				items: entries
-			});
-			await refreshAll();
+			}).updates(getEventSales, getEventShoppingList, readEvent, readEventLive, listEvents, listEventsLive);
 			manualQuantities = {};
 			saleNotes = '';
 			activeTab = 'financials';
@@ -272,12 +275,12 @@
 		if (!window.confirm('Delete this sale record and restore deducted inventory?')) return;
 		deletingSaleId = saleId;
 		try {
+			markLocalEntityMutation('event', [eventId]);
 			await deleteSaleCommand({
 				eventId,
 				saleId,
 				restoreInventory: true
-			});
-			await refreshAll();
+			}).updates(getEventSales, getEventShoppingList, readEvent, readEventLive, listEvents, listEventsLive);
 			toast.success('Sale record removed and inventory restored.');
 		} catch (err: any) {
 			toast.error(err?.message || 'Failed to delete sale record');
@@ -296,6 +299,7 @@
 
 		isRestocking = true;
 		try {
+			markLocalEntityMutation('event', [eventId]);
 			const res = await restockEventShoppingList({
 				eventId,
 				items: shortfallItems.map((item) => ({
@@ -307,8 +311,7 @@
 					currency: item.currency,
 					storageLocation: restockStorageLocation.trim() || undefined
 				}))
-			});
-			await refreshAll();
+			}).updates(getEventSales, getEventShoppingList, readEvent, readEventLive, listEvents, listEventsLive);
 			toast.success(`Restocked ${res.insertedCount} consumable item(s) into inventory.`);
 		} catch (err: any) {
 			toast.error(err?.message || 'Failed to restock shopping list items');
@@ -459,6 +462,7 @@
 
 		isRecordingSales = true;
 		try {
+			markLocalEntityMutation('event', [eventId]);
 			await recordSalesCommand({
 				eventId,
 				retrievalMode: scanRetrievalMode,
@@ -469,8 +473,7 @@
 					? `Gemini tally scan: ${scanResult.rawNotes}`
 					: 'Scanned from printed price list with pencil tallies',
 				items: entries
-			});
-			await refreshAll();
+			}).updates(getEventSales, getEventShoppingList, readEvent, readEventLive, listEvents, listEventsLive);
 			scanResult = null;
 			scanPreviewUrl = null;
 			scanImageBase64 = null;

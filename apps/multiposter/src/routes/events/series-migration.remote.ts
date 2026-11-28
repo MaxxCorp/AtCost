@@ -12,8 +12,9 @@ import {
 import { eq, and, isNotNull, inArray, count, sql } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { processSeriesMigrationBatchSchema } from '#lib/validations/series-migration.js';
-import { invalidateEvent, invalidateAllKioskViews } from '#lib/server/cache/index.js';
-import { listEvents } from './list.remote';
+import { invalidateAllKioskViews } from '#lib/server/cache/index.js';
+import { commitEventChange } from '#lib/server/events/sync-commit.js';
+import { publishEventChange } from '#lib/server/realtime.js';
 
 type MigrationTask =
 	| { type: 'migrate_master'; eventId: string }
@@ -311,13 +312,19 @@ export const processSeriesMigrationBatch = command(
 				})
 				.where(eq(syncOperationTable.id, operationId));
 
-			await invalidateEvent();
-			void checkSeriesMigrationStatus().refresh();
-			try {
-				await requested(listEvents, 20).refreshAll();
-			} catch { /* ignore */ }
-			void listEvents().refresh();
-			void listEvents({}).refresh();
+			await commitEventChange({
+				action: 'update',
+				ids: [],
+				user,
+				extraRefresh: () => {
+					void checkSeriesMigrationStatus().refresh();
+				}
+			});
+			await publishEventChange('update', ['series-migration'], {
+				id: user.id,
+				name: user.name || user.email,
+				email: user.email
+			});
 		} else {
 			await db
 				.update(syncOperationTable)

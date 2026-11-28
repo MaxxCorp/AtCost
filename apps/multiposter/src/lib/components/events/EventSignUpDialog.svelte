@@ -6,11 +6,14 @@
 	import { getLocale } from "#lib/paraglide/runtime.js";
 	import { toast } from "svelte-sonner";
 	import { isSignUpClosed, formatSignUpClosureDateDisplay } from "#lib/utils/event-signup.js";
+	import { markLocalEntityMutation } from "@ac/ui";
 	import {
 		submitEventSignUp,
 		lookupEventReservation,
 		cancelEventReservation,
 	} from "../../../routes/events/[id]/signup.remote.js";
+	import { readEvent, readEventLive } from "../../../routes/events/[id]/read.remote.js";
+	import { listEvents, listEventsLive } from "../../../routes/events/list.remote.js";
 	import {
 		UserPlus,
 		Search,
@@ -215,6 +218,7 @@
 
 		submitting = true;
 		try {
+			markLocalEntityMutation("event", [eventId]);
 			const res = await submitEventSignUp({
 				eventId,
 				givenName: givenName.trim(),
@@ -225,7 +229,7 @@
 				notifyOnChanges,
 				subscribeLocationNewsletter,
 				existingContactId,
-			});
+			}).updates(readEvent, readEventLive, listEvents, listEventsLive);
 
 			toast.success(
 				res.isUpdate
@@ -255,12 +259,13 @@
 		cancelling = true;
 		formError = null;
 		try {
+			markLocalEntityMutation("event", [eventId]);
 			await cancelEventReservation({
 				eventId,
 				contactId: existingContactId,
 				email: lookupVerifiedEmail || emails.find((x) => x.trim()) || undefined,
 				phone: lookupVerifiedPhone || phones.find((x) => x.trim()) || undefined,
-			});
+			}).updates(readEvent, readEventLive, listEvents, listEventsLive);
 			toast.success(
 				m.reservation_cancelled?.() || "Your reservation has been cancelled."
 			);

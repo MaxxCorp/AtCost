@@ -4,8 +4,7 @@ import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js
 import { priceAssociationSchema, getPriceAssociationsSchema } from '@ac/validations';
 import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '#lib/server/associations.js';
 import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
-import { invalidateEvent } from '#lib/server/cache/index.js';
-import { readEvent } from '../events/[id]/read.remote.js';
+import { commitEventChange } from '#lib/server/events/sync-commit.js';
 
 const tableMap = {
     event: eventPrice,
@@ -23,7 +22,7 @@ export const addPriceAssociation = command(priceAssociationSchema, async (data) 
     const targetId = priceId || priceListId;
     if (!targetId) throw new Error('Missing price list ID');
 
-    await dbAddAssociation({
+    const resolvedEntityId = await dbAddAssociation({
         type,
         entityId,
         itemId: targetId,
@@ -34,11 +33,19 @@ export const addPriceAssociation = command(priceAssociationSchema, async (data) 
     });
 
     if (type === 'event') {
-        await invalidateEvent(entityId);
-        void readEvent(entityId).refresh();
+        await commitEventChange({
+            action: 'update',
+            ids: [entityId, resolvedEntityId],
+            user,
+            extraRefresh: async () => {
+                try { await requested(fetchEntityPrices, 20).refreshAll(); } catch { /* ignore */ }
+                await fetchEntityPrices({ type, entityId }).refresh();
+            }
+        });
+    } else {
+        try { await requested(fetchEntityPrices, 20).refreshAll(); } catch { /* ignore */ }
+        await fetchEntityPrices({ type, entityId }).refresh();
     }
-    try { await requested(fetchEntityPrices, 20).refreshAll(); } catch { /* ignore */ }
-    await fetchEntityPrices({ type, entityId }).refresh();
     return { success: true };
 });
 
@@ -50,7 +57,7 @@ export const removePriceAssociation = command(priceAssociationSchema, async (dat
     const targetId = priceId || priceListId;
     if (!targetId) throw new Error('Missing price list ID');
 
-    await dbRemoveAssociation({
+    const resolvedEntityId = await dbRemoveAssociation({
         type,
         entityId,
         itemId: targetId,
@@ -61,11 +68,19 @@ export const removePriceAssociation = command(priceAssociationSchema, async (dat
     });
 
     if (type === 'event') {
-        await invalidateEvent(entityId);
-        void readEvent(entityId).refresh();
+        await commitEventChange({
+            action: 'update',
+            ids: [entityId, resolvedEntityId],
+            user,
+            extraRefresh: async () => {
+                try { await requested(fetchEntityPrices, 20).refreshAll(); } catch { /* ignore */ }
+                await fetchEntityPrices({ type, entityId }).refresh();
+            }
+        });
+    } else {
+        try { await requested(fetchEntityPrices, 20).refreshAll(); } catch { /* ignore */ }
+        await fetchEntityPrices({ type, entityId }).refresh();
     }
-    try { await requested(fetchEntityPrices, 20).refreshAll(); } catch { /* ignore */ }
-    await fetchEntityPrices({ type, entityId }).refresh();
     return { success: true };
 });
 

@@ -102,9 +102,8 @@
         { label: m.december(), value: 12 },
     ];
 
-    // Initialize state from existing value if present
-    $effect(() => {
-        if (open && value) {
+    function initFromValue() {
+        if (value) {
             try {
                 const rule = RRule.fromString(value);
                 freq = rule.options.freq;
@@ -209,7 +208,7 @@
             } catch (e) {
                 console.error("Failed to parse recurrence rule", e);
             }
-        } else if (open && !value) {
+        } else {
             // Reset to defaults
             freq = RRule.WEEKLY;
             interval = 1;
@@ -225,7 +224,12 @@
             yearlyType = "day";
             bymonth = 1;
         }
-    });
+    }
+
+    // Initialize immediately if mounted already open
+    if (open) {
+        initFromValue();
+    }
 
     function save() {
         const options: any = {
@@ -377,7 +381,7 @@
     let previewText = $derived(previewRule ? formatRecurrenceText(previewRule, { includeEnd: true, dtstart: startDate }) : "");
 </script>
 
-<Dialog.Root bind:open>
+<Dialog.Root bind:open onOpenChange={(nextOpen) => { if (nextOpen) initFromValue(); }}>
     <Dialog.Content class="sm:max-w-[500px]">
         <Dialog.Header>
             <Dialog.Title>{title || m.recurrence_settings()}</Dialog.Title>
@@ -410,7 +414,7 @@
                         }}
                         class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
-                        {#each frequencies as f}
+                        {#each frequencies as f (f.value)}
                             <option value={f.value}>{f.label}</option>
                         {/each}
                     </select>
@@ -447,7 +451,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-4 items-start gap-2 sm:gap-4">
                     <span class="text-left sm:text-right text-sm font-medium leading-none sm:mt-2">{m.on_days()}</span>
                     <div class="col-span-1 sm:col-span-3 flex flex-wrap gap-2">
-                        {#each weekdays as day}
+                        {#each weekdays as day (day.value)}
                             <button
                                 type="button"
                                 class="h-8 w-10 text-xs rounded-md border transition-colors {byweekday.includes(day.value) ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted border-input'}"

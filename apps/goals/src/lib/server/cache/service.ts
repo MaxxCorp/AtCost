@@ -1,7 +1,24 @@
+import { getRequestEvent } from '$app/server';
 import { getRedisClient, isCircuitOpen, recordFailure, recordSuccess } from './redis';
 
-const memVersionCache = new Map<string, { version: number; expiresAt: number }>();
-const MEM_VERSION_TTL_MS = 5000;
+const requestVersionCache = new WeakMap<Request, Map<string, Promise<number>>>();
+
+function getCurrentRequest(): Request | null {
+    try {
+        return getRequestEvent()?.request ?? null;
+    } catch {
+        return null;
+    }
+}
+
+function getRequestNamespaceMap(req: Request): Map<string, Promise<number>> {
+    let map = requestVersionCache.get(req);
+    if (!map) {
+        map = new Map();
+        requestVersionCache.set(req, map);
+    }
+    return map;
+}
 
 export async function getCache<T>(key: string): Promise<T | null> {
     const client = getRedisClient();
@@ -56,34 +73,50 @@ export async function cached<T>(
 }
 
 export async function getNamespaceVersion(namespace: string): Promise<number> {
-    const entry = memVersionCache.get(namespace);
-    if (entry && Date.now() <= entry.expiresAt) return entry.version;
-
-    const client = getRedisClient();
-    if (!client || isCircuitOpen()) return 1;
-    try {
-        const versionStr = await client.get(`version:${namespace}`);
-        const version = versionStr ? parseInt(versionStr, 10) : 1;
-        recordSuccess();
-        const validVersion = isNaN(version) ? 1 : version;
-        memVersionCache.set(namespace, { version: validVersion, expiresAt: Date.now() + MEM_VERSION_TTL_MS });
-        return validVersion;
-    } catch (err) {
-        recordFailure(err);
-        return 1;
+    const req = getCurrentRequest();
+    if (req) {
+        const reqMap = getRequestNamespaceMap(req);
+        const existing = reqMap.get(namespace);
+        if (existing) return existing;
     }
+
+    const fetchVersion = async (): Promise<number> => {
+        const client = getRedisClient();
+        if (!client || isCircuitOpen()) return 1;
+        try {
+            const versionStr = await client.get(`version:${namespace}`);
+            const version = versionStr ? parseInt(versionStr, 10) : 1;
+            recordSuccess();
+            return isNaN(version) || version < 1 ? 1 : version;
+        } catch (err) {
+            recordFailure(err);
+            return 1;
+        }
+    };
+
+    const promise = fetchVersion();
+    if (req) {
+        getRequestNamespaceMap(req).set(namespace, promise);
+    }
+    return promise;
 }
 
 export async function bumpNamespaceVersion(namespace: string): Promise<number> {
-    memVersionCache.delete(namespace);
+    const req = getCurrentRequest();
     const client = getRedisClient();
-    if (!client || isCircuitOpen()) return 1;
+    if (!client || isCircuitOpen()) {
+        if (req) getRequestNamespaceMap(req).delete(namespace);
+        return 1;
+    }
     try {
         const newVersion = await client.incr(`version:${namespace}`);
+        if (req) {
+            getRequestNamespaceMap(req).set(namespace, Promise.resolve(newVersion));
+        }
         recordSuccess();
-        memVersionCache.set(namespace, { version: newVersion, expiresAt: Date.now() + MEM_VERSION_TTL_MS });
         return newVersion;
     } catch (err) {
+        if (req) getRequestNamespaceMap(req).delete(namespace);
         recordFailure(err);
         return 1;
     }

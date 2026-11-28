@@ -1,8 +1,15 @@
 <script lang="ts">
-    import { LoadingSection, ErrorSection, getLastListUrl, recordActiveItem } from "@ac/ui";
+    import { LoadingSection, ErrorSection, getLastListUrl, recordActiveItem, markLocalEntityMutation } from "@ac/ui";
     import * as m from "#lib/paraglide/messages.js";
     import { page } from "$app/state";
-    import { readEvent } from "../read.remote";
+    import { readEvent, readEventLive } from "../read.remote";
+    import { listEvents, listEventsLive } from "../../list.remote";
+    import {
+        realtimeEntitySync,
+        isRealtimeCapabilityReady,
+        preferLiveQuery,
+        refreshRemoteResource,
+    } from "#lib/client/realtime/client.svelte.js";
     import { authClient } from "#lib/auth.js";
     import { deleteEvents } from "../../delete.remote";
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
@@ -61,7 +68,11 @@
     } from "#lib/utils/kiosk-flat-helpers.js";
 
     const eventId = $derived(page.params.id || "");
-    const eventQuery = $derived(readEvent(eventId));
+    const eventQuery = $derived(
+        isRealtimeCapabilityReady()
+            ? (preferLiveQuery() ? readEventLive(eventId) : readEvent(eventId))
+            : null
+    );
 
     const session = authClient.useSession();
     // Check if the user is authorized to edit
@@ -94,24 +105,32 @@
     let copiedLink = $state(false);
     let heroImageFailed = $state(false);
     let pricesDialogOpen = $state(false);
-    let signUpDialogOpen = $state(false);
-    let autoOpenedSignUpKey: string | null = null;
+    let manualSignUpOpen = $state(false);
+    let dismissedAutoSignUpKey = $state<string | null>(null);
 
-    $effect(() => {
-        const ev = eventQuery.current;
+    const autoSignUpKey = $derived.by(() => {
+        const ev = eventQuery?.current;
         const signupParam = page.url.searchParams.get("signup");
         if (
             ev &&
             (signupParam === "true" || signupParam === "1") &&
             (ev.signUpMode === "recommended" || ev.signUpMode === "required")
         ) {
-            const key = `${ev.id}:${signupParam}`;
-            if (autoOpenedSignUpKey !== key) {
-                autoOpenedSignUpKey = key;
-                signUpDialogOpen = true;
-            }
+            return `${ev.id}:${signupParam}`;
         }
+        return null;
     });
+
+    let signUpDialogOpen = $derived(
+        manualSignUpOpen || (autoSignUpKey !== null && dismissedAutoSignUpKey !== autoSignUpKey),
+    );
+
+    function setSignUpDialogOpen(nextOpen: boolean) {
+        manualSignUpOpen = nextOpen;
+        if (!nextOpen && autoSignUpKey) {
+            dismissedAutoSignUpKey = autoSignUpKey;
+        }
+    }
 
     onMount(() => {
         if (eventId) {
@@ -166,7 +185,8 @@
 
         deletingSeriesId = event.id;
         try {
-            await deleteEvents({ ids: [event.id] });
+            markLocalEntityMutation("event", [event.id, eventId]);
+            await deleteEvents({ ids: [event.id], deleteSeries: true }).updates(listEvents, listEventsLive, readEvent, readEventLive);
             await goto(getLastListUrl("events", "/events"));
         } catch (err) {
             console.error("Delete series error:", err);
@@ -187,7 +207,8 @@
 
         deletingSeriesId = event.id;
         try {
-            await deleteEvents({ ids: [event.id] });
+            markLocalEntityMutation("event", [event.id, eventId]);
+            await deleteEvents({ ids: [event.id] }).updates(listEvents, listEventsLive, readEvent, readEventLive);
             await goto(getLastListUrl("events", "/events"));
         } catch (err) {
             console.error("Delete instance error:", err);
@@ -202,9 +223,12 @@
     }
 </script>
 
-<div class="container mx-auto px-4 py-4 md:py-6">
+<div
+    class="container mx-auto px-4 py-4 md:py-6"
+    {@attach realtimeEntitySync("event", () => eventId, () => refreshRemoteResource(eventQuery), { skipWhenLiveQuerySupported: true })}
+>
     <div class="max-w-7xl mx-auto">
-        {#if eventQuery.loading && !eventQuery.current}
+        {#if !eventQuery || (eventQuery.loading && !eventQuery.current)}
             <LoadingSection message={m.loading_event_data()} />
         {:else if eventQuery.current}
             {@const event = eventQuery.current}
@@ -374,7 +398,7 @@
                                             </p>
                                             {#if event.resolvedContact.roles && event.resolvedContact.roles.length > 0}
                                                 <div class="flex items-center gap-1 flex-wrap">
-                                                    {#each event.resolvedContact.roles as roleName}
+                                                    {#each event.resolvedContact.roles as roleName (roleName)}
                                                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
                                                             {roleName}
                                                         </span>
@@ -439,13 +463,13 @@
                                                     {m.feature_contacts_title?.() ?? "Contacts"}
                                                 </h4>
                                                 <div class="space-y-1">
-                                                    {#each otherContacts as otherContact}
+                                                    {#each otherContacts as otherContact, idx (otherContact.contact?.id || otherContact.id || idx)}
                                                         {@const cObj = otherContact.contact || otherContact}
                                                         <div class="flex items-center justify-between text-xs text-gray-700">
                                                             <span class="font-medium">{cObj.displayName || `${cObj.givenName || ''} ${cObj.familyName || ''}`.trim() || cObj.company || cObj.name}</span>
                                                             {#if cObj.roles && cObj.roles.length > 0}
                                                                 <div class="flex items-center gap-1">
-                                                                    {#each cObj.roles as role}
+                                                                    {#each cObj.roles as role (role.id || role.name || role)}
                                                                         <span class="px-1.5 py-0.2 rounded text-[10px] bg-gray-100 text-gray-600 font-medium">
                                                                             {role.name || role}
                                                                         </span>
@@ -842,14 +866,14 @@
 
                 <!-- Prices & Price List Dialog -->
                 <EventSignUpDialog
-                    bind:open={signUpDialogOpen}
+                    bind:open={() => signUpDialogOpen, setSignUpDialogOpen}
                     eventId={event.id}
                     eventSummary={event.summary}
                     signUpMode={event.signUpMode || "off"}
                     signUpClosureDate={event.signUpClosureDate ?? null}
                     resolvedSignUpContact={event.resolvedSignUpContact ?? null}
                     locations={event.locations || []}
-                    onSuccess={() => void eventQuery.refresh()}
+                    onSuccess={() => { if (!preferLiveQuery()) void refreshRemoteResource(eventQuery); }}
                 />
                 {#if event.prices && event.prices.length > 0}
                     <Dialog.Root bind:open={pricesDialogOpen}>

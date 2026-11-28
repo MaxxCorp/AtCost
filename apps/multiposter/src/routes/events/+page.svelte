@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { listEvents } from "./list.remote";
+	import { listEvents, listEventsLive } from "./list.remote";
+	import { readEvent, readEventLive } from "./[id]/read.remote";
 	import { updateEventsStatus } from "./status.remote";
 	import { checkSeriesMigrationStatus } from "./series-migration.remote";
 	import { listTags } from "../tags/list.remote";
@@ -33,7 +34,7 @@
 	} from "@lucide/svelte";
 	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
 	import { toast } from "svelte-sonner";
-	import { onMount, untrack, tick } from "svelte";
+	import { onMount, untrack } from "svelte";
 	import { SvelteDate } from "svelte/reactivity";
 	import { getPreference, setPreference } from "#lib/utils/idb.js";
 	import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
@@ -43,7 +44,13 @@
 		getStatusBadgeClass,
 		getStatusDotClass,
 	} from "#lib/utils/format-event-status.js";
-	import { goto, afterNavigate } from "$app/navigation";
+	import { goto } from "$app/navigation";
+	import {
+		realtimeCollectionSync,
+		ensureRealtimeCapability,
+		preferLiveQuery,
+		refreshRemoteResource,
+	} from "#lib/client/realtime/client.svelte.js";
 	import {
 		formatFriendlyEventTime,
 		getEventDurationDays,
@@ -104,6 +111,7 @@
 		syncPageToUrl,
 		recordActiveItem,
 		activeItemAnchor,
+		markLocalEntityMutation,
 		isDateFilterActive,
 		getDateFilterBounds,
 		type FilterGroup,
@@ -203,6 +211,7 @@
 		} else if (newMode === "unrolled" && sortField === "startDateTime") {
 			sortOrder = "asc";
 		}
+		persistPreferences();
 		setPage(1);
 	}
 
@@ -216,6 +225,7 @@
 		} else {
 			setDisplayMode("compacted", false);
 		}
+		persistPreferences();
 		setPage(1);
 	}
 
@@ -255,6 +265,7 @@
 			checked: excludePast,
 			onchange: (val: boolean) => {
 				excludePast = val;
+				persistPreferences();
 				setPage(1);
 			},
 		},
@@ -265,6 +276,7 @@
 			onchange: (val: boolean) => {
 				excludeSeries = val;
 				if (excludeSeries) onlySeries = false;
+				persistPreferences();
 				setPage(1);
 			},
 		},
@@ -275,6 +287,7 @@
 			onchange: (val: boolean) => {
 				onlySeries = val;
 				if (onlySeries) excludeSeries = false;
+				persistPreferences();
 				setPage(1);
 			},
 		},
@@ -296,14 +309,50 @@
 			clearLabel: m.filter_date_clear(),
 			onchange: (val: DateFilterValue) => {
 				dateFilter = val;
+				persistPreferences();
 				setPage(1);
 			},
 		},
 	]);
 
+	function persistPreferences() {
+		if (!isInitialized) return;
+		const currentFilterValues = $state.snapshot(filterValues);
+		const currentDateFilter = $state.snapshot(dateFilter);
+		modeSettings[displayMode] = {
+			filterValues: currentFilterValues,
+			dateFilter: currentDateFilter,
+			excludePast,
+			excludeSeries,
+			onlySeries,
+			sortOrder,
+			limit,
+		};
+
+		const prefsToSave = {
+			displayMode,
+			displayModeOverrides: $state.snapshot(displayModeOverrides),
+			modeSettings,
+			sortField,
+			sortOrder,
+			filterValues: currentFilterValues,
+			dateFilter: currentDateFilter,
+			excludePast,
+			excludeSeries,
+			onlySeries,
+			limit,
+		};
+		setPreference("eventsFilters", JSON.stringify(prefsToSave)).catch(
+			console.error,
+		);
+	}
+
 	onMount(async () => {
 		try {
-			const savedPrefs = await getPreference("eventsFilters", null);
+			const [savedPrefs] = await Promise.all([
+				getPreference("eventsFilters", null),
+				ensureRealtimeCapability(),
+			]);
 			if (savedPrefs) {
 				const prefs = JSON.parse(savedPrefs as string);
 				if (prefs.displayModeOverrides) displayModeOverrides = prefs.displayModeOverrides;
@@ -345,53 +394,7 @@
 			console.error("Failed to load preferences", e);
 		} finally {
 			isInitialized = true;
-			await tick();
-			void eventsQuery.refresh();
 		}
-	});
-
-	$effect(() => {
-		if (!isInitialized) return;
-		// Capture reactive dependencies to track
-		const currentMode = displayMode;
-		const currentFilterValues = filterValues;
-		const currentDateFilter = dateFilter;
-		const currentExcludePast = excludePast;
-		const currentExcludeSeries = excludeSeries;
-		const currentOnlySeries = onlySeries;
-		const currentSortOrder = sortOrder;
-		const currentLimit = limit;
-		const currentSortField = sortField;
-		const currentOverrides = displayModeOverrides;
-
-		untrack(() => {
-			modeSettings[currentMode] = {
-				filterValues: currentFilterValues,
-				dateFilter: currentDateFilter,
-				excludePast: currentExcludePast,
-				excludeSeries: currentExcludeSeries,
-				onlySeries: currentOnlySeries,
-				sortOrder: currentSortOrder,
-				limit: currentLimit,
-			};
-
-			const prefsToSave = {
-				displayMode: currentMode,
-				displayModeOverrides: currentOverrides,
-				modeSettings,
-				sortField: currentSortField,
-				sortOrder: currentSortOrder,
-				filterValues: currentFilterValues,
-				dateFilter: currentDateFilter,
-				excludePast: currentExcludePast,
-				excludeSeries: currentExcludeSeries,
-				onlySeries: currentOnlySeries,
-				limit: currentLimit,
-			};
-			setPreference("eventsFilters", JSON.stringify(prefsToSave)).catch(
-				console.error,
-			);
-		});
 	});
 
 	const filterState = $derived({
@@ -413,16 +416,17 @@
 		try {
 			if (isSeriesMaster) {
 				if (!window.confirm(m.delete_series_confirm())) return;
-				await deleteEvents({ ids: [event.id], deleteSeries: true });
+				markLocalEntityMutation("event", [event.id]);
+				await deleteEvents({ ids: [event.id], deleteSeries: true }).updates(listEvents, listEventsLive, readEvent, readEventLive);
 			} else {
 				if (
 					!window.confirm(m.delete_confirm({ item: m.event_label() }))
 				)
 					return;
-				await deleteEvents({ ids: [event.id] });
+				markLocalEntityMutation("event", [event.id]);
+				await deleteEvents({ ids: [event.id] }).updates(listEvents, listEventsLive, readEvent, readEventLive);
 			}
 			toast.success(m.delete_successful());
-			await eventsQuery.refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());
 		}
@@ -433,12 +437,12 @@
 
 	const migrationStatusQuery = checkSeriesMigrationStatus();
 	const migrationStatus = $derived(migrationStatusQuery.current);
-	const eventsQuery = $derived(listEvents(filterState));
-
-	afterNavigate(() => {
-		void eventsQuery.refresh();
-	});
-	const eventsRes = $derived(eventsQuery.current);
+	const eventsQuery = $derived(
+		isInitialized
+			? (preferLiveQuery() ? listEventsLive(filterState) : listEvents(filterState))
+			: null
+	);
+	const eventsRes = $derived(eventsQuery?.current);
 	const rawEvents = $derived(eventsRes?.data ?? []);
 	const displayedEvents = $derived(
 		displayMode === "unrolled"
@@ -491,14 +495,14 @@
 		if (selectedIds.length === 0) return;
 		isBulkUpdatingStatus = true;
 		try {
+			markLocalEntityMutation("event", selectedIds);
 			await updateEventsStatus({
 				ids: selectedIds,
 				status: newStatus,
 				updateSeries: displayMode === 'compacted',
-			});
+			}).updates(listEvents, listEventsLive, readEvent, readEventLive);
 			toast.success(m.successfully_saved ? m.successfully_saved() : "Status updated successfully");
 			selectedIds = [];
-			await eventsQuery.refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());
 		} finally {
@@ -519,20 +523,23 @@
 		if (!window.confirm(confirmMsg)) return;
 
 		try {
+			markLocalEntityMutation("event", selectedIds);
 			await deleteEvents({
 				ids: selectedIds,
 				deleteSeries: isCompacted,
-			});
+			}).updates(listEvents, listEventsLive, readEvent, readEventLive);
 			toast.success(m.delete_successful());
 			selectedIds = [];
-			await eventsQuery.refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());
 		}
 	}
 </script>
 
-<div class="container mx-auto px-4 py-8">
+<div
+	class="container mx-auto px-4 py-8"
+	{@attach realtimeCollectionSync("event", () => refreshRemoteResource(eventsQuery), { skipWhenLiveQuerySupported: true })}
+>
 	<div class="max-w-5xl mx-auto space-y-6">
 		<Breadcrumb feature="events" />
 
@@ -590,7 +597,7 @@
 						statusData={migrationStatus}
 						oncomplete={async () => {
 							await migrationStatusQuery.refresh();
-							await eventsQuery.refresh();
+							await refreshRemoteResource(eventsQuery);
 						}}
 						onclose={() => (showMigrationDialog = false)}
 					/>
@@ -621,7 +628,10 @@
 					dateFilters={dateFilters}
 					bind:filters={filterValues}
 					buttonLabel={m.filters()}
-					onchange={() => setPage(1)}
+					onchange={() => {
+						persistPreferences();
+						setPage(1);
+					}}
 				/>
 
 				<div
@@ -638,8 +648,10 @@
 					</select>
 					<button
 						class="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-						onclick={() =>
-							(sortOrder = sortOrder === "desc" ? "asc" : "desc")}
+						onclick={() => {
+							sortOrder = sortOrder === "desc" ? "asc" : "desc";
+							persistPreferences();
+						}}
 						title={sortOrder === "desc"
 							? m.descending()
 							: m.ascending()}
@@ -673,6 +685,7 @@
 						exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
 					},
 				};
+				persistPreferences();
 				setPage(1);
 			}}
 			onclearall={() => {
@@ -687,20 +700,21 @@
 				onlySeries = false;
 				searchInput = "";
 				searchQuery = "";
+				persistPreferences();
 				setPage(1);
 			}}
 		/>
 
 		{#if isInitialized}
 			<svelte:boundary>
-				{#if eventsQuery.loading && !eventsRes}
+				{#if eventsQuery?.loading && !eventsRes}
 					<div class="grid grid-cols-1 gap-5">
 						<div class="p-12 text-center bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
 							<RefreshCw class="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
 						</div>
 					</div>
 				{/if}
-				<div class={[eventsQuery.loading && "opacity-60 transition-opacity"]}>
+				<div class={[eventsQuery?.loading && "opacity-60 transition-opacity"]}>
 					<div class="grid grid-cols-1 gap-5">
 				{#each displayedEvents as event (event.id)}
 					{@const upcomingInst = getUpcomingInstance(event)}
@@ -1074,7 +1088,10 @@
 						<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
 							<select
 								bind:value={limit}
-								onchange={() => setPage(1)}
+								onchange={() => {
+									persistPreferences();
+									setPage(1);
+								}}
 								class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
 							>
 								<option value={10}>{m.items_per_page({ count: 10 })}</option>

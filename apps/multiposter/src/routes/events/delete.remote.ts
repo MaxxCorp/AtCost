@@ -1,16 +1,13 @@
-import { command, requested } from '$app/server';
+import { command } from '$app/server';
 import { db } from '@ac/db';
 import { event, recurringSeries } from '@ac/db';
 import { inArray, or, eq, and, sql } from '@ac/db';
-import { listEvents } from './list.remote';
-import { readEvent } from './[id]/read.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 import { syncService } from '#lib/server/sync/service.js';
-import { publishEventChange } from '#lib/server/realtime.js';
 import { getStorageProvider } from '#lib/server/blob-storage/index.js';
-import { invalidateEvent } from '#lib/server/cache/index.js';
 import { revertMaterializedExceptions } from '#lib/server/events/exceptions.js';
+import { commitEventChange } from '#lib/server/events/sync-commit.js';
 
 export const deleteEvents = command(
 	v.object({
@@ -30,21 +27,12 @@ export const deleteEvents = command(
 				eventIds: ids
 			});
 
-			try {
-				await requested(readEvent, 20).refreshAll();
-			} catch (e) {
-				console.warn('[deleteEvents] requested readEvent refresh warning:', e);
-			}
-			for (const id of new Set([...ids, ...result.deletedIds, ...result.affectedMasterIds, ...result.revertedVirtualIds])) {
-				void readEvent(id).refresh();
-			}
-			try {
-				await requested(listEvents, 20).refreshAll();
-			} catch (e) {
-				console.warn('[deleteEvents] requested listEvents refresh warning:', e);
-			}
-			void listEvents().refresh();
-			void listEvents({}).refresh();
+			await commitEventChange({
+				action: 'delete',
+				ids: [...ids, ...result.deletedIds, ...result.revertedVirtualIds],
+				masterIds: result.affectedMasterIds,
+				user
+			});
 
 			return {
 				success: true,
@@ -58,6 +46,8 @@ export const deleteEvents = command(
 		// Handle virtual instances (e.g. `${masterId}_inst_${iso}`)
 		const virtualIds = ids.filter(id => id.includes('_inst_'));
 		const realIds = ids.filter(id => !id.includes('_inst_'));
+		const affectedMasterIds = new Set<string>();
+		const deletedVirtualExceptionIds: string[] = [];
 
 		if (deleteSeries) {
 			for (const vId of virtualIds) {
@@ -67,7 +57,6 @@ export const deleteEvents = command(
 				}
 			}
 		} else {
-			const affectedMasterIds = new Set<string>();
 			for (const vId of virtualIds) {
 				const [masterId, isoDate] = vId.split('_inst_');
 				if (masterId && isoDate) {
@@ -79,7 +68,6 @@ export const deleteEvents = command(
 						if (!existingExdates.includes(decodedIso)) {
 							await db.update(event).set({ exdates: [...existingExdates, decodedIso] }).where(eq(event.id, masterId));
 						}
-						await invalidateEvent([masterId, vId]);
 					}
 
 					// Also check if an exception row existed in DB for this slot and clean it up
@@ -98,7 +86,7 @@ export const deleteEvents = command(
 					if (existingException) {
 						await syncService.deleteEventMappings(user.id, [existingException.id]).catch(console.error);
 						await db.delete(event).where(eq(event.id, existingException.id));
-						await invalidateEvent([existingException.id]);
+						deletedVirtualExceptionIds.push(existingException.id);
 					}
 				}
 			}
@@ -111,10 +99,13 @@ export const deleteEvents = command(
 			}
 
 			if (realIds.length === 0) {
-				try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
-				void listEvents().refresh();
-				void listEvents({}).refresh();
-				return { success: true, deletedCount: virtualIds.length };
+				await commitEventChange({
+					action: 'delete',
+					ids: [...virtualIds, ...deletedVirtualExceptionIds],
+					masterIds: affectedMasterIds,
+					user
+				});
+				return { success: true, deletedCount: virtualIds.length, revertedVirtualIds: [] as string[] };
 			}
 		}
 
@@ -130,6 +121,7 @@ export const deleteEvents = command(
 			// Find all series IDs and master IDs
 			const seriesIds = [...new Set(targetEvents.map(e => e.seriesId).filter(Boolean) as string[])];
 			const masterIds = [...new Set(targetEvents.map(e => e.recurringEventId || e.id))];
+			for (const mId of masterIds) affectedMasterIds.add(mId);
 
 			// Fetch ALL events that belong to these series or masters so we can clean up storage/sync
 			const allAffectedEvents = await db.query.event.findMany({
@@ -175,9 +167,10 @@ export const deleteEvents = command(
 			});
 
 			// If deleting an instance of a series, record its date in master's exdates so it doesn't resurrect
-			const affectedMasterIds = new Set<string>();
+			const physicalMasterIds = new Set<string>();
 			for (const e of eventsToDelete) {
 				if (e.recurringEventId && e.startDateTime) {
+					physicalMasterIds.add(e.recurringEventId);
 					affectedMasterIds.add(e.recurringEventId);
 					const [master] = await db.select().from(event).where(eq(event.id, e.recurringEventId));
 					if (master) {
@@ -204,25 +197,18 @@ export const deleteEvents = command(
 
 			await db.delete(event).where(inArray(event.id, realIds));
 
-			for (const mId of affectedMasterIds) {
+			for (const mId of physicalMasterIds) {
 				await syncService.syncItems(user.id, [mId], 'event').catch(console.error);
 			}
 		}
 
-		// Perform notification and cache invalidation for all deleted event IDs
-		if (eventIdsToDelete.length > 0) {
-			await publishEventChange('delete', eventIdsToDelete).catch(console.error);
-			await invalidateEvent(eventIdsToDelete);
-		}
-
-		try {
-			await requested(listEvents, 20).refreshAll();
-		} catch (e) {
-			console.warn('[deleteEvents] requested refresh warning:', e);
-		}
-		void listEvents().refresh();
-		void listEvents({}).refresh();
-		return { success: true, deletedCount: eventIdsToDelete.length, revertedVirtualIds: [] as string[] };
+		await commitEventChange({
+			action: 'delete',
+			ids: [...eventIdsToDelete, ...deletedVirtualExceptionIds, ...ids],
+			masterIds: affectedMasterIds,
+			user
+		});
+		return { success: true, deletedCount: eventIdsToDelete.length + deletedVirtualExceptionIds.length, revertedVirtualIds: [] as string[] };
 	}
 );
 

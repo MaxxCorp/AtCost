@@ -1,18 +1,15 @@
-import { form, getRequestEvent, requested } from '$app/server';
+import { form } from '$app/server';
 import { db } from '@ac/db';
 import { event, eventResource, eventContact, eventContactRole, eventLocation, tag, eventTag, eventPrice, recurringSeries, campaign, syncConfig } from '@ac/db';
 import { eq, and, or, ne, inArray, sql } from '@ac/db';
-import { listEvents } from '../list.remote';
-import { readEvent } from './read.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { updateEventSchema } from '#lib/validations/events.js';
 import { error } from '@sveltejs/kit';
 import { generateEventAssets } from '#lib/server/events/assets.js';
-import { publishEventChange } from '#lib/server/realtime.js';
+import { commitEventChange } from '#lib/server/events/sync-commit.js';
 import { syncService } from '#lib/server/sync/service.js';
 import { parseDateTime, toZoned } from '@internationalized/date';
 import { createDefaultCampaignContent, getCampaignTargetIds, type CampaignContent } from '@ac/validations';
-import { invalidateEvent } from '#lib/server/cache/index.js';
 import { hasVirtualInstanceChanged } from '#lib/server/events/exceptions.js';
 import { computeOccurrenceSignUpClosureDate } from '#lib/server/events/recurrence.js';
 import { getStoredEventContactsHeadcount, reconcileEventParticipantsCount } from '#lib/server/events/participants.js';
@@ -746,12 +743,6 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 		console.log('Event updated successfully, refreshing list...');
 
-		await publishEventChange('update', [effectiveTargetId], {
-			id: user.id,
-			name: user.name || user.email,
-			email: user.email
-		});
-
 		try {
 			const syncTargets = [effectiveTargetId];
 			if (instMasterId && !syncTargets.includes(instMasterId)) {
@@ -765,18 +756,13 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			console.error('[Update Remote] Sync error:', err);
 		}
 
-		// Refresh caches
-		const invalidateIds = [effectiveTargetId, data.id];
-		if (instMasterId) invalidateIds.push(instMasterId);
-		await invalidateEvent(invalidateIds);
-		await readEvent(effectiveTargetId).refresh();
-		if (data.id !== effectiveTargetId) {
-			await readEvent(data.id).refresh();
-		}
-		try { await requested(readEvent, 20).refreshAll(); } catch { /* ignore */ }
-		try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
-		void listEvents().refresh();
-		void listEvents({}).refresh();
+		// Invalidate Redis cache FIRST, refresh single-flight queries, then publish realtime change
+		await commitEventChange({
+			action: 'update',
+			ids: [effectiveTargetId, data.id, ...oldInstanceIds],
+			masterIds: [instMasterId, oldEvent?.recurringEventId],
+			user
+		});
 		console.log('--- updateEvent DONE ---');
 		return { success: true };
 	} catch (err: any) {

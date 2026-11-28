@@ -14,17 +14,34 @@
         type PriceMenuPaperSize,
         type PriceMenuSettings,
     } from "#lib/utils/price-menu.js";
-    import { readEvent } from "../read.remote";
+    import { readEvent, readEventLive } from "../read.remote";
     import { uploadMedia } from "../../../cms/media/create.remote";
+    import {
+        realtimeEntitySync,
+        isRealtimeCapabilityReady,
+        preferLiveQuery,
+        refreshRemoteResource,
+    } from "#lib/client/realtime/client.svelte.js";
 
     const eventId = $derived(page.params.id || "");
-    const eventQuery = $derived(readEvent(eventId));
+    const eventQuery = $derived(
+        isRealtimeCapabilityReady()
+            ? (preferLiveQuery() ? readEventLive(eventId) : readEvent(eventId))
+            : null
+    );
 
     // --- Settings (persisted per event in the browser) ---
     let settings = $state<PriceMenuSettings>(defaultPriceMenuSettings(m.price_menu_vat_default()));
     let zoom = $state(0.8);
-    let settingsLoaded = $state(false);
     const storageKey = $derived(`price_menu_settings_${eventId}`);
+
+    function saveSettings() {
+        try {
+            localStorage.setItem(storageKey, JSON.stringify($state.snapshot(settings)));
+        } catch (e) {
+            console.warn("Could not persist price menu settings (quota exceeded?)", e);
+        }
+    }
 
     onMount(() => {
         try {
@@ -33,32 +50,22 @@
         } catch (e) {
             console.error("Failed to load price menu settings", e);
         }
-        settingsLoaded = true;
-    });
-
-    // Persist settings to localStorage (external system sync)
-    $effect(() => {
-        const snapshot = JSON.stringify($state.snapshot(settings));
-        if (!settingsLoaded) return;
-        try {
-            localStorage.setItem(storageKey, snapshot);
-        } catch (e) {
-            console.warn("Could not persist price menu settings (quota exceeded?)", e);
-        }
     });
 
     const paper = $derived(PRICE_MENU_PAPER[settings.paperSize]);
 
-    const prices = $derived((eventQuery.current?.prices ?? []) as unknown as PriceMenuList[]);
+    const prices = $derived((eventQuery?.current?.prices ?? []) as unknown as PriceMenuList[]);
     const visibleLists = $derived(prices.filter((p) => !settings.hiddenPriceIds.includes(p.id ?? "")));
 
     function toggleList(id: string, visible: boolean) {
         const hidden = settings.hiddenPriceIds.filter((h) => h !== id);
         settings.hiddenPriceIds = visible ? hidden : [...hidden, id];
+        saveSettings();
     }
 
     function resetSettings() {
         settings = defaultPriceMenuSettings(m.price_menu_vat_default());
+        saveSettings();
     }
 
     function setZoom(value: number) {
@@ -68,10 +75,12 @@
     // --- Sponsors ---
     function addSponsor() {
         settings.sponsors = [...settings.sponsors, { id: `sponsor-${Date.now()}`, name: "", logoUrl: "" }];
+        saveSettings();
     }
 
     function removeSponsor(id: string) {
         settings.sponsors = settings.sponsors.filter((s) => s.id !== id);
+        saveSettings();
     }
 
     function readAsDataUrl(file: File): Promise<string> {
@@ -102,6 +111,7 @@
             }
         }
         settings.sponsors = settings.sponsors.map((s) => (s.id === sponsorId ? { ...s, logoUrl: url } : s));
+        saveSettings();
     }
 
     const paperOptions: PriceMenuPaperSize[] = ["A5", "A4", "A3"];
@@ -117,7 +127,7 @@
 </script>
 
 <svelte:head>
-    <title>{m.price_menu_title()} – {eventQuery.current?.summary ?? ""}</title>
+    <title>{m.price_menu_title()} – {eventQuery?.current?.summary ?? ""}</title>
     {@html `<style>@page { size: ${paper.width}mm ${paper.height}mm; margin: ${paper.margin}mm; }</style>`}
 </svelte:head>
 
@@ -127,7 +137,10 @@
             type="checkbox"
             class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-gray-300 text-violet-600 focus:ring-violet-500"
             {checked}
-            onchange={(e) => onToggle(e.currentTarget.checked)}
+            onchange={(e) => {
+                onToggle(e.currentTarget.checked);
+                saveSettings();
+            }}
         />
         <span class="text-sm leading-snug text-gray-800">
             {label}
@@ -143,7 +156,10 @@
         {#each options as option (option.value)}
             <button
                 type="button"
-                onclick={() => onSelect(option.value)}
+                onclick={() => {
+                    onSelect(option.value);
+                    saveSettings();
+                }}
                 class="cursor-pointer rounded-md px-2.5 py-1 text-xs font-semibold transition-colors {current === option.value
                     ? 'bg-violet-600 text-white shadow-xs'
                     : 'text-gray-600 hover:text-gray-900'}"
@@ -154,11 +170,14 @@
     </div>
 {/snippet}
 
-{#if eventQuery.loading && !eventQuery.current}
+{#if !eventQuery || (eventQuery.loading && !eventQuery.current)}
     <LoadingSection message={m.loading_event_data()} />
 {:else if eventQuery.current}
     {@const event = eventQuery.current}
-    <div class="flex min-h-screen flex-col bg-slate-100 print:block print:min-h-0 print:bg-white">
+    <div
+        class="flex min-h-screen flex-col bg-slate-100 print:block print:min-h-0 print:bg-white"
+        {@attach realtimeEntitySync("event", () => eventId, () => refreshRemoteResource(eventQuery), { skipWhenLiveQuerySupported: true })}
+    >
         <!-- Toolbar -->
         <header class="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white/95 px-4 py-2.5 backdrop-blur-md print:hidden">
             <div class="flex items-center gap-3">
@@ -197,7 +216,7 @@
 
         <div class="flex flex-1 flex-col lg:flex-row print:block">
             <!-- Settings panel -->
-            <aside class="w-full shrink-0 space-y-2 overflow-y-auto border-gray-200 bg-white p-4 lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:w-80 lg:border-r print:hidden">
+            <aside oninput={saveSettings} onchange={saveSettings} class="w-full shrink-0 space-y-2 overflow-y-auto border-gray-200 bg-white p-4 lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:w-80 lg:border-r print:hidden">
                 <div class="flex items-center justify-between pb-1">
                     <p class="text-xs text-gray-500">{m.price_menu_print_hint()}</p>
                     <button
@@ -258,7 +277,10 @@
                                     <button
                                         type="button"
                                         aria-label={color}
-                                        onclick={() => (settings.accent = color)}
+                                        onclick={() => {
+                                            settings.accent = color;
+                                            saveSettings();
+                                        }}
                                         class="h-6 w-6 cursor-pointer rounded-full border-2 transition-transform hover:scale-110 {settings.accent === color
                                             ? 'border-gray-900'
                                             : 'border-white ring-1 ring-gray-200'}"

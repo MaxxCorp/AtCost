@@ -3,17 +3,16 @@
     import { goto } from "$app/navigation";
     import { toast } from "svelte-sonner";
 	import { createEvent } from "./create.remote";
+	import { listEvents, listEventsLive } from "../list.remote";
+	import { readEvent, readEventLive } from "../[id]/read.remote";
 	import { createEventSchema } from "#lib/validations/events.js";
 	import EventForm from "#lib/components/events/EventForm.svelte";
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
-    import { Button, useFormValidationFeedback } from "@ac/ui";
+    import { Button, markLocalEntityMutation } from "@ac/ui";
 
     const formId = crypto.randomUUID();
     const rf = createEvent.for(formId);
-    const feedback = useFormValidationFeedback(() => rf, {
-        message: () => m.please_fix_validation(),
-    });
 </script>
 
 <div class="max-w-3xl mx-auto px-4 py-8 text-left">
@@ -31,7 +30,8 @@
         <form
         {...rf.preflight(createEventSchema).enhance(async ({ submit }: any) => {
                 try {
-                    const res = await submit();
+                    markLocalEntityMutation('event');
+                    const res = await submit().updates(listEvents, listEventsLive, readEvent, readEventLive);
                     const result: any = (rf as any).result || res;
                     if (res === false || result?.error || result?.success === false) {
                         toast.error(

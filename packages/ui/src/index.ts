@@ -54,6 +54,13 @@ export { default as GdprAdminList } from './components/gdpr/GdprAdminList.svelte
 export { IsMobile } from "./hooks/is-mobile.svelte.ts";
 export { handleDelete } from "./hooks/handleDelete.svelte.ts";
 export {
+    getTabClientId,
+    markLocalEntityMutation,
+    isOwnRecentMutation,
+    attachRealtimeRefresh,
+    type RealtimeRefreshAttachmentOptions,
+} from "./hooks/realtimeSync.svelte.ts";
+export {
     useFormValidationFeedback,
     findFirstInvalidElement,
     highlightAndScrollToElement,

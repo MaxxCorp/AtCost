@@ -24,7 +24,10 @@
         translateIssue,
         matchContactSearch,
         useFormValidationFeedback,
+        markLocalEntityMutation,
     } from "@ac/ui";
+    import { listEvents, listEventsLive } from "../../../routes/events/list.remote";
+    import { readEvent, readEventLive } from "../../../routes/events/[id]/read.remote";
     import { listResourcesWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import type { ResourceWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import ResourceForm from "#lib/components/resources/ResourceForm.svelte";
@@ -576,29 +579,12 @@
             "EUR",
     );
 
-    let resourceAvailability = $state<
-        Record<
-            string,
-            {
-                available: boolean;
-                reason?: string;
-                eventId?: string;
-                eventTitle?: string;
-            }
-        >
-    >({});
-    let contactAvailability = $state<
-        Record<
-            string,
-            {
-                available: boolean;
-                reason?: string;
-                eventId?: string;
-                eventTitle?: string;
-            }
-        >
-    >({});
-    let availabilityLoading = $state(false);
+    type AvailabilityEntry = {
+        available: boolean;
+        reason?: string;
+        eventId?: string;
+        eventTitle?: string;
+    };
 
     function hasAllocationCalendars(resItem: any): boolean {
         if (!resItem || !resItem.allocationCalendars) return false;
@@ -644,68 +630,43 @@
         return isNaN(d.getTime()) ? "" : d.toISOString();
     });
 
-    let lastQueryKey = "";
+    const availabilityParams = $derived(
+        activeStartIso && activeEndIso
+            ? {
+                  startDateTime: activeStartIso,
+                  endDateTime: activeEndIso,
+                  eventId: initialData?.id,
+                  prepMinutes: showPrepTime
+                      ? Number(rf.fields.prepMinutes?.value?.()) || 0
+                      : 0,
+                  teardownMinutes: showTeardownTime
+                      ? Number(rf.fields.teardownMinutes?.value?.()) || 0
+                      : 0,
+              }
+            : null,
+    );
+
+    const availabilityQuery = $derived(
+        availabilityParams ? checkEventAvailability(availabilityParams) : null,
+    );
+
+    const resourceAvailability = $derived(
+        (availabilityQuery?.current?.resourceAvailability ?? {}) as Record<
+            string,
+            AvailabilityEntry
+        >,
+    );
+    const contactAvailability = $derived(
+        (availabilityQuery?.current?.contactAvailability ?? {}) as Record<
+            string,
+            AvailabilityEntry
+        >,
+    );
+    const availabilityLoading = $derived(Boolean(availabilityQuery?.loading));
 
     function refreshAvailability() {
-        const startIso = activeStartIso;
-        const endIso = activeEndIso;
-        if (!startIso || !endIso) return;
-        const prep = showPrepTime
-            ? Number(rf.fields.prepMinutes?.value?.()) || 0
-            : 0;
-        const teardown = showTeardownTime
-            ? Number(rf.fields.teardownMinutes?.value?.()) || 0
-            : 0;
-        availabilityLoading = true;
-        checkEventAvailability({
-            startDateTime: startIso,
-            endDateTime: endIso,
-            eventId: initialData?.id,
-            prepMinutes: prep,
-            teardownMinutes: teardown,
-        })
-            .then((res) => {
-                if (res) {
-                    resourceAvailability = res.resourceAvailability || {};
-                    contactAvailability = res.contactAvailability || {};
-                }
-                availabilityLoading = false;
-            })
-            .catch((err) => {
-                console.error("[EventForm] availability error:", err);
-                availabilityLoading = false;
-            });
+        void availabilityQuery?.refresh();
     }
-
-    $effect(() => {
-        const startIso = activeStartIso;
-        const endIso = activeEndIso;
-        const prep = showPrepTime
-            ? Number(rf.fields.prepMinutes?.value?.()) || 0
-            : 0;
-        const teardown = showTeardownTime
-            ? Number(rf.fields.teardownMinutes?.value?.()) || 0
-            : 0;
-        const queryKey = `${startIso}_${endIso}_${initialData?.id || "new"}_p${prep}_t${teardown}`;
-
-        if (!startIso || !endIso || queryKey === lastQueryKey) return;
-        lastQueryKey = queryKey;
-
-        untrack(() => {
-            refreshAvailability();
-        });
-    });
-
-    $effect(() => {
-        if (typeof window === "undefined") return;
-        const handleFocus = () => {
-            refreshAvailability();
-        };
-        window.addEventListener("focus", handleFocus);
-        return () => {
-            window.removeEventListener("focus", handleFocus);
-        };
-    });
 
     // svelte-ignore state_referenced_locally
     const initialParticipantState = extractContactParticipantState(
@@ -725,7 +686,6 @@
     );
 
     let isRoleManagerOpen = $state(false);
-    // svelte-ignore state_referenced_locally
     let contactRolesState = $state<Record<string, string[]>>(
         (() => {
             const map: Record<string, string[]> = {};
@@ -887,16 +847,19 @@
                     if (assignedRole) {
                         newRolesState[contactItem.id] = [assignedRole.id];
                         if (initialData?.id) {
+                            markLocalEntityMutation("event", [initialData.id]);
                             void updateContactRoles({
                                 eventId: initialData.id,
                                 contactId: contactItem.id,
                                 roleIds: [assignedRole.id],
-                            }).catch((err) =>
-                                console.error(
-                                    "Failed to update contact role:",
-                                    err,
-                                ),
-                            );
+                            })
+                                .updates(readEvent, readEventLive, listEvents, listEventsLive, fetchEntityContacts)
+                                .catch((err) =>
+                                    console.error(
+                                        "Failed to update contact role:",
+                                        err,
+                                    ),
+                                );
                         }
                     }
                 } else {
@@ -1114,13 +1077,7 @@
     );
 
     let totalParticipants = $derived(baseline + contactsHeadcount);
-    // svelte-ignore state_referenced_locally
-    let currentPrices = $state<any[]>(initialData?.prices || []);
-    $effect(() => {
-        if (initialData?.prices !== undefined) {
-            currentPrices = initialData.prices;
-        }
-    });
+    let currentPrices = $derived<any[]>(initialData?.prices || []);
 
     function syncParticipantsField(
         ids: string[] = currentContactIds,
@@ -1176,14 +1133,17 @@
         );
 
         if (initialData?.id) {
+            markLocalEntityMutation("event", [initialData.id]);
             updateAssociationPartySizeRemote({
                 type: "event",
                 entityId: initialData.id,
                 contactId: contactObj.id,
                 partySize: clamped,
-            }).catch((err: any) =>
-                toast.error(err.message || "Failed to update party size"),
-            );
+            })
+                .updates(readEvent, readEventLive, listEvents, listEventsLive, fetchEntityContacts)
+                .catch((err: any) =>
+                    toast.error(err.message || "Failed to update party size"),
+                );
         }
     }
 
@@ -1209,14 +1169,17 @@
         );
 
         if (initialData?.id) {
+            markLocalEntityMutation("event", [initialData.id]);
             updateAssociationStatusRemote({
                 type: "event",
                 entityId: initialData.id,
                 contactId: contactObj.id,
                 status: nextStatus,
-            } as any).catch((err: any) =>
-                toast.error(err.message || m.failed_to_update_status()),
-            );
+            } as any)
+                .updates(readEvent, readEventLive, listEvents, listEventsLive, fetchEntityContacts)
+                .catch((err: any) =>
+                    toast.error(err.message || m.failed_to_update_status()),
+                );
         }
     }
 
@@ -1265,6 +1228,14 @@
         }
     }
 </script>
+
+<svelte:window
+    onfocus={() => {
+        if (availabilityQuery && !availabilityQuery.loading) {
+            void availabilityQuery.refresh();
+        }
+    }}
+/>
 
 <datalist id="timezones">
     {#each timezones as tz}
@@ -1841,14 +1812,16 @@
         </div>
     </div>
 
-    <RecurrenceDialog
-        bind:open={showRecurrenceDialog}
-        value={eventRecurrenceRule || null}
-        startDate={rf.fields.startDate.value() || currentStartDateVal}
-        onchange={(val: string | null) => {
-            rf.fields.recurrence.set(val ?? "");
-        }}
-    />
+    {#if showRecurrenceDialog}
+        <RecurrenceDialog
+            bind:open={showRecurrenceDialog}
+            value={eventRecurrenceRule || null}
+            startDate={rf.fields.startDate.value() || currentStartDateVal}
+            onchange={(val: string | null) => {
+                rf.fields.recurrence.set(val ?? "");
+            }}
+        />
+    {/if}
     {#if eventRecurrenceRule || initialData?.recurrence}
         <input {...rf.fields.recurrence.as("hidden", eventRecurrenceRule)} />
     {/if}
@@ -1997,11 +1970,12 @@
                 selectorSortOrder="desc"
                 hierarchical={true}
                 groupIcon={MapPin}
+                relatedQueries={[readEvent, readEventLive, listEvents, listEventsLive]}
                 addAssociationRemote={async (p: any) => {
                     const res = await addResourceAssociation({
                         ...p,
                         resourceId: p.itemId,
-                    } as any);
+                    } as any).updates(readEvent, readEventLive, listEvents, listEventsLive, fetchEntityResources);
                     if (res?.success)
                         toast.success(m.resource_synced_success());
                     else toast.error(m.resource_sync_failed());
@@ -2011,7 +1985,7 @@
                     const res = await removeResourceAssociation({
                         ...p,
                         resourceId: p.itemId,
-                    } as any);
+                    } as any).updates(readEvent, readEventLive, listEvents, listEventsLive, fetchEntityResources);
                     if (res?.success)
                         toast.success(m.resource_unlinked_sync_cleaned());
                     else toast.error(m.resource_sync_failed());
@@ -2307,12 +2281,13 @@
                 filters={getLocationFilterGroups(m)}
                 listItemsRemote={listLocations as any}
                 fetchAssociationsRemote={fetchEntityLocations as any}
-                addAssociationRemote={async (p: any) =>
+                relatedQueries={[readEvent, readEventLive, listEvents, listEventsLive]}
+                addAssociationRemote={(p: any) =>
                     addLocationAssociation({
                         ...p,
                         locationId: p.itemId,
                     } as any)}
-                removeAssociationRemote={async (p: any) =>
+                removeAssociationRemote={(p: any) =>
                     removeLocationAssociation({
                         ...p,
                         locationId: p.itemId,
@@ -2765,9 +2740,10 @@
             }}
             listItemsRemote={listContacts as any}
             fetchAssociationsRemote={fetchEntityContacts as any}
-            addAssociationRemote={async (p: any) =>
+            relatedQueries={[readEvent, readEventLive, listEvents, listEventsLive]}
+            addAssociationRemote={(p: any) =>
                 addAssociation({ ...p, contactId: p.itemId } as any)}
-            removeAssociationRemote={async (p: any) =>
+            removeAssociationRemote={(p: any) =>
                 removeAssociation({ ...p, contactId: p.itemId } as any)}
             createRemote={createContact}
             createSchema={createContactSchema}
@@ -3238,23 +3214,25 @@
                             {/if}
                         </div>
 
-                        <RecurrenceDialog
-                            bind:open={showSignUpRecurrenceDialog}
-                            value={effectiveSignUpRecurrence || null}
-                            startDate={signUpClosureDatePart ||
-                                rf.fields.startDate.value() ||
-                                currentStartDateVal}
-                            title={m.sign_up_recurrence_title()}
-                            description={m.sign_up_recurrence_description()}
-                            onchange={(val: string | null) => {
-                                const next = (val ?? "").trim();
-                                rf.fields.signUpRecurrence?.set(
-                                    next && next !== seriesRecurrenceRule
-                                        ? next
-                                        : "",
-                                );
-                            }}
-                        />
+                        {#if showSignUpRecurrenceDialog}
+                            <RecurrenceDialog
+                                bind:open={showSignUpRecurrenceDialog}
+                                value={effectiveSignUpRecurrence || null}
+                                startDate={signUpClosureDatePart ||
+                                    rf.fields.startDate.value() ||
+                                    currentStartDateVal}
+                                title={m.sign_up_recurrence_title()}
+                                description={m.sign_up_recurrence_description()}
+                                onchange={(val: string | null) => {
+                                    const next = (val ?? "").trim();
+                                    rf.fields.signUpRecurrence?.set(
+                                        next && next !== seriesRecurrenceRule
+                                            ? next
+                                            : "",
+                                    );
+                                }}
+                            />
+                        {/if}
                     {:else if isSeries}
                         <div
                             class="pt-1 flex flex-wrap items-center gap-2 text-xs text-gray-600"
@@ -3409,9 +3387,10 @@
                 selectorSortField="name"
                 listItemsRemote={listPrices as any}
                 fetchAssociationsRemote={fetchEntityPrices as any}
-                addAssociationRemote={async (p: any) =>
+                relatedQueries={[readEvent, readEventLive, listEvents, listEventsLive]}
+                addAssociationRemote={(p: any) =>
                     addPriceAssociation({ ...p, priceId: p.itemId } as any)}
-                removeAssociationRemote={async (p: any) =>
+                removeAssociationRemote={(p: any) =>
                     removePriceAssociation({ ...p, priceId: p.itemId } as any)}
                 onchange={(ids: string[], items: any[]) => {
                     currentPrices = items;

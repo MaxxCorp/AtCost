@@ -1,17 +1,15 @@
-import { form, getRequestEvent, requested } from '$app/server';
+import { form } from '$app/server';
 import { error } from "@sveltejs/kit";
 import { db } from '@ac/db';
 import { event, eventResource, eventContact, eventContactRole, eventLocation, tag, eventTag, eventPrice, recurringSeries, campaign, syncConfig } from '@ac/db';
 import { eq, and, or, sql, inArray } from '@ac/db';
-import { listEvents } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { createEventSchema } from '#lib/validations/events.js';
 import { generateEventAssets } from '#lib/server/events/assets.js';
-import { publishEventChange } from '#lib/server/realtime.js';
+import { commitEventChange } from '#lib/server/events/sync-commit.js';
 import { syncService } from '#lib/server/sync/service.js';
 import { parseDateTime, toZoned } from '@internationalized/date';
 import { createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
-import { invalidateEvent } from '#lib/server/cache/index.js';
 import { reconcileEventParticipantsCount } from '#lib/server/events/participants.js';
 import { extractSignUpFields } from '#lib/utils/event-signup.js';
 import * as m from '#lib/paraglide/messages.js';
@@ -326,18 +324,17 @@ export const createEvent = form(createEventSchema, async (data) => {
 
 		console.log('Event created successfully, triggering sync and refreshing list...');
 
-		await publishEventChange('create', [newEvent.id]);
-
 		try {
 			await syncService.syncItems(user.id, [newEvent.id], 'event');
 		} catch (err) {
 			console.error('[Create Remote] Sync error:', err);
 		}
 
-		await invalidateEvent([newEvent.id]);
-		try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
-		void listEvents().refresh();
-		void listEvents({}).refresh();
+		await commitEventChange({
+			action: 'create',
+			ids: [newEvent.id],
+			user
+		});
 		console.log('--- createEvent DONE ---');
 		return { success: true };
 	} catch (err: any) {

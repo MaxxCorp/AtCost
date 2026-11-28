@@ -1,4 +1,3 @@
-// import Ably from 'ably'; // Removed for dynamic import
 import {
     ABLY_API_KEY,
     VERCEL,
@@ -6,11 +5,19 @@ import {
     ENABLE_REALTIME_POLLING,
     FORCE_ABLY
 } from '$app/env/private';
-
+import { getRequestEvent } from '$app/server';
 import { EventEmitter } from 'events';
 
 // Lazy initialization to avoid connecting if not configured or during build
-let restClient: any = null; // using any to avoid type issues with dynamic import
+let restClient: any = null;
+
+function getOriginTabIdFromRequest(): string | undefined {
+    try {
+        return getRequestEvent()?.request.headers.get('x-ac-tab-id') ?? undefined;
+    } catch {
+        return undefined;
+    }
+}
 
 export async function getClient() {
     if (!restClient && ABLY_API_KEY) {
@@ -34,28 +41,46 @@ export function getEntityChannelName(entityType: string, id: string): string {
     return `entity:${entityType}:${id}`;
 }
 
+export function getEntityListChannelName(entityType: string): string {
+    return `entity-list:${entityType}`;
+}
+
+const ENTITY_CHANNEL_RE = /^entity:[a-z-]+:[a-zA-Z0-9_.:-]+$/;
+const LIST_CHANNEL_RE = /^entity-list:[a-z-]+$/;
+const LEGACY_CHANNEL_RE = /^(event-changes|announcement-changes)$/;
+
+export function isValidRealtimeChannel(channel: string): boolean {
+    return ENTITY_CHANNEL_RE.test(channel) || LIST_CHANNEL_RE.test(channel) || LEGACY_CHANNEL_RE.test(channel);
+}
+
 export type EventChangeType = 'create' | 'update' | 'delete';
+export type EntityChangeAction = EventChangeType;
+
+export interface RealtimeActor {
+    id: string;
+    name?: string;
+    email?: string;
+}
 
 export interface EventChangeMessage {
     type: EventChangeType;
+    action?: EntityChangeAction;
+    entityType?: string;
     ids: string[];
+    eventIds?: string[];
     timestamp: number;
-    updatedBy?: {
-        id: string;
-        name?: string;
-        email?: string;
-    };
+    originTabId?: string;
+    updatedBy?: RealtimeActor;
 }
 
 export interface EntityChangeMessage {
     entityType: string;
     id: string;
+    ids?: string[];
     action: EventChangeType;
-    updatedBy?: {
-        id: string;
-        name?: string;
-        email?: string;
-    };
+    type?: EventChangeType;
+    updatedBy?: RealtimeActor;
+    originTabId?: string;
     timestamp: number;
     fields?: Record<string, any>;
 }
@@ -64,6 +89,7 @@ export type RealtimeProviderType = 'sse' | 'ably' | 'polling' | 'none';
 
 export interface RealtimeInfo {
     provider: RealtimeProviderType;
+    supportsLiveQueries: boolean;
     ablyConfigured: boolean;
     isPermanentServer: boolean;
     pollingEnabled: boolean;
@@ -84,7 +110,7 @@ export function isServerlessEnvironment(): boolean {
 
 /**
  * Negotiate the optimal realtime provider based on environment and configuration:
- * 1. Full/Permanent server is preferred for cost ($0 in-process SSE instead of cloud messaging fees).
+ * 1. Full/Permanent server is preferred for cost ($0 in-process SSE / SvelteKit query.live instead of cloud messaging fees).
  * 2. Serverless/Edge uses Ably if ABLY_API_KEY is configured.
  * 3. Polling requires explicit opt-in (ENABLE_REALTIME_POLLING=true) to prevent high serverless function costs.
  * 4. Otherwise, realtime is disabled with an explanatory reason.
@@ -94,11 +120,12 @@ export function getRealtimeInfo(): RealtimeInfo {
     const ablyConfigured = !!ABLY_API_KEY;
     const pollingEnabled = ENABLE_REALTIME_POLLING === 'true' || process.env.ENABLE_REALTIME_POLLING === 'true';
 
-    // Priority 1: Full / Permanent server (Cost: $0 - uses built-in server memory & SSE)
+    // Priority 1: Full / Permanent server (Cost: $0 - uses built-in server memory & SSE / query.live)
     // Only use Ably on permanent server if FORCE_ABLY is explicitly set
     if (isPermanent && FORCE_ABLY !== 'true') {
         return {
             provider: 'sse',
+            supportsLiveQueries: true,
             ablyConfigured,
             isPermanentServer: true,
             pollingEnabled
@@ -109,6 +136,7 @@ export function getRealtimeInfo(): RealtimeInfo {
     if (ablyConfigured) {
         return {
             provider: 'ably',
+            supportsLiveQueries: false,
             ablyConfigured: true,
             isPermanentServer: isPermanent,
             pollingEnabled
@@ -119,6 +147,7 @@ export function getRealtimeInfo(): RealtimeInfo {
     if (pollingEnabled) {
         return {
             provider: 'polling',
+            supportsLiveQueries: false,
             ablyConfigured: false,
             isPermanentServer: isPermanent,
             pollingEnabled: true
@@ -128,6 +157,7 @@ export function getRealtimeInfo(): RealtimeInfo {
     // Real-time collaboration unavailable
     return {
         provider: 'none',
+        supportsLiveQueries: false,
         ablyConfigured: false,
         isPermanentServer: isPermanent,
         pollingEnabled: false,
@@ -214,6 +244,90 @@ class LocalRealtimeHub {
 export const localRealtimeHub = new LocalRealtimeHub();
 
 /**
+ * Broadcast change notifications across both entity-specific and collection channels
+ * for both local SSE (persistent servers) and Ably REST (serverless/edge).
+ */
+export async function publishEntityChanges(options: {
+    entityType: string;
+    action: EntityChangeAction;
+    ids: string[];
+    updatedBy?: RealtimeActor;
+    originTabId?: string;
+    fields?: Record<string, any>;
+}): Promise<void> {
+    const uniqueIds = Array.from(new Set(options.ids.filter(Boolean)));
+    if (uniqueIds.length === 0) return;
+
+    const timestamp = Date.now();
+    const originTabId = options.originTabId ?? getOriginTabIdFromRequest();
+    const listChannel = getEntityListChannelName(options.entityType);
+
+    const listMessage: EventChangeMessage = {
+        type: options.action,
+        action: options.action,
+        entityType: options.entityType,
+        ids: uniqueIds,
+        ...(options.entityType === 'event' ? { eventIds: uniqueIds } : {}),
+        timestamp,
+        ...(originTabId ? { originTabId } : {}),
+        ...(options.updatedBy ? { updatedBy: options.updatedBy } : {})
+    };
+
+    const collectionChannels = [listChannel];
+    if (options.entityType === 'event') {
+        collectionChannels.push(CHANNELS.EVENT_CHANGES);
+    } else if (options.entityType === 'announcement') {
+        collectionChannels.push(CHANNELS.ANNOUNCEMENT_CHANGES);
+    }
+
+    // 1. Broadcast to local in-memory hub (permanent server SSE)
+    for (const channel of collectionChannels) {
+        localRealtimeHub.publish(channel, listMessage);
+    }
+    for (const id of uniqueIds) {
+        const entityMessage: EntityChangeMessage = {
+            entityType: options.entityType,
+            id,
+            ids: [id],
+            action: options.action,
+            type: options.action,
+            timestamp,
+            ...(originTabId ? { originTabId } : {}),
+            ...(options.updatedBy ? { updatedBy: options.updatedBy } : {}),
+            ...(options.fields ? { fields: options.fields } : {})
+        };
+        localRealtimeHub.publish(getEntityChannelName(options.entityType, id), entityMessage);
+    }
+
+    // 2. Broadcast to Ably if configured
+    const client = await getClient();
+    if (!client) return;
+
+    try {
+        const publishes: Promise<unknown>[] = collectionChannels.map((channel) =>
+            client.channels.get(channel).publish('change', listMessage)
+        );
+        for (const id of uniqueIds) {
+            const entityMessage: EntityChangeMessage = {
+                entityType: options.entityType,
+                id,
+                ids: [id],
+                action: options.action,
+                type: options.action,
+                timestamp,
+                ...(originTabId ? { originTabId } : {}),
+                ...(options.updatedBy ? { updatedBy: options.updatedBy } : {}),
+                ...(options.fields ? { fields: options.fields } : {})
+            };
+            publishes.push(client.channels.get(getEntityChannelName(options.entityType, id)).publish('change', entityMessage));
+        }
+        await Promise.allSettled(publishes);
+    } catch (error) {
+        console.error(`Failed to publish ${options.entityType} changes to Ably:`, error);
+    }
+}
+
+/**
  * Publish a change notification for a specific entity
  */
 export async function publishEntityChange(
@@ -221,34 +335,19 @@ export async function publishEntityChange(
     id: string,
     change: {
         action: EventChangeType;
-        updatedBy?: { id: string; name?: string; email?: string };
+        updatedBy?: RealtimeActor;
+        originTabId?: string;
         fields?: Record<string, any>;
     }
 ) {
-    const channelName = getEntityChannelName(entityType, id);
-    const message: EntityChangeMessage = {
+    await publishEntityChanges({
         entityType,
-        id,
         action: change.action,
+        ids: [id],
         updatedBy: change.updatedBy,
-        fields: change.fields,
-        timestamp: Date.now()
-    };
-
-    // 1. Broadcast to local hub for persistent server SSE clients
-    localRealtimeHub.publish(channelName, message);
-
-    // 2. Broadcast to Ably if available
-    const client = await getClient();
-    if (!client) {
-        return;
-    }
-
-    try {
-        await client.channels.get(channelName).publish('change', message);
-    } catch (error) {
-        console.error(`Failed to publish entity change to Ably channel ${channelName}:`, error);
-    }
+        originTabId: change.originTabId,
+        fields: change.fields
+    });
 }
 
 /**
@@ -257,50 +356,16 @@ export async function publishEntityChange(
 export async function publishEventChange(
     type: EventChangeType,
     ids: string[],
-    updatedBy?: { id: string; name?: string; email?: string }
+    updatedBy?: RealtimeActor,
+    originTabId?: string
 ) {
-    const message: EventChangeMessage = {
-        type,
+    await publishEntityChanges({
+        entityType: 'event',
+        action: type,
         ids,
         updatedBy,
-        timestamp: Date.now()
-    };
-
-    // 1. Broadcast to local hub
-    localRealtimeHub.publish(CHANNELS.EVENT_CHANGES, message);
-    for (const id of ids) {
-        localRealtimeHub.publish(getEntityChannelName('event', id), {
-            entityType: 'event',
-            id,
-            action: type,
-            updatedBy,
-            timestamp: message.timestamp
-        });
-    }
-
-    // 2. Broadcast to Ably if configured
-    const client = await getClient();
-    if (!client) {
-        return;
-    }
-
-    try {
-        await client.channels.get(CHANNELS.EVENT_CHANGES).publish('change', message);
-
-        await Promise.allSettled(
-            ids.map((id) =>
-                client.channels.get(getEntityChannelName('event', id)).publish('change', {
-                    entityType: 'event',
-                    id,
-                    action: type,
-                    updatedBy,
-                    timestamp: message.timestamp
-                })
-            )
-        );
-    } catch (error) {
-        console.error('Failed to publish event change to Ably:', error);
-    }
+        originTabId
+    });
 }
 
 /**
@@ -309,48 +374,14 @@ export async function publishEventChange(
 export async function publishAnnouncementChange(
     type: EventChangeType,
     ids: string[],
-    updatedBy?: { id: string; name?: string; email?: string }
+    updatedBy?: RealtimeActor,
+    originTabId?: string
 ) {
-    const message: EventChangeMessage = {
-        type,
+    await publishEntityChanges({
+        entityType: 'announcement',
+        action: type,
         ids,
         updatedBy,
-        timestamp: Date.now()
-    };
-
-    // 1. Broadcast to local hub
-    localRealtimeHub.publish(CHANNELS.ANNOUNCEMENT_CHANGES, message);
-    for (const id of ids) {
-        localRealtimeHub.publish(getEntityChannelName('announcement', id), {
-            entityType: 'announcement',
-            id,
-            action: type,
-            updatedBy,
-            timestamp: message.timestamp
-        });
-    }
-
-    // 2. Broadcast to Ably if configured
-    const client = await getClient();
-    if (!client) {
-        return;
-    }
-
-    try {
-        await client.channels.get(CHANNELS.ANNOUNCEMENT_CHANGES).publish('change', message);
-
-        await Promise.allSettled(
-            ids.map((id) =>
-                client.channels.get(getEntityChannelName('announcement', id)).publish('change', {
-                    entityType: 'announcement',
-                    id,
-                    action: type,
-                    updatedBy,
-                    timestamp: message.timestamp
-                })
-            )
-        );
-    } catch (error) {
-        console.error('Failed to publish announcement change to Ably:', error);
-    }
+        originTabId
+    });
 }

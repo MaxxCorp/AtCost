@@ -1,12 +1,13 @@
 <script lang="ts">
-    import { LoadingSection, ErrorSection, getLastListUrl, recordActiveItem, useFormValidationFeedback } from "@ac/ui";
+    import { LoadingSection, ErrorSection, getLastListUrl, recordActiveItem, markLocalEntityMutation } from "@ac/ui";
     import * as m from "#lib/paraglide/messages.js";
     import { page } from "$app/state";
     import { browser } from '$app/env';
     import { goto } from "$app/navigation";
     import { toast } from "svelte-sonner";
-	import { readEvent } from "./read.remote";
+	import { readEvent, readEventLive } from "./read.remote";
 	import { updateEvent } from "./update.remote";
+    import { listEvents, listEventsLive } from "../list.remote";
     import { deleteEvents as deleteEventAction } from "../delete.remote";
 	import { updateEventSchema } from "#lib/validations/events.js";
 	import EventForm from "#lib/components/events/EventForm.svelte";
@@ -30,17 +31,48 @@
         RemoteChangeBanner,
         type CollaborationRoom
     } from "#lib/client/collaboration/index.js";
+    import {
+        isRealtimeCapabilityReady,
+        preferLiveQuery,
+        refreshRemoteResource
+    } from "#lib/client/realtime/client.svelte.js";
 
     import { onMount } from "svelte";
 
 	const eventId = $derived(page.params.id || "");
     const eventRf = $derived(updateEvent.for(eventId));
-    const feedback = useFormValidationFeedback(() => eventRf, {
-        message: () => m.please_fix_validation(),
-    });
-    const eventQuery = $derived(readEvent(eventId));
+    const eventQuery = $derived(
+        isRealtimeCapabilityReady()
+            ? (preferLiveQuery() ? readEventLive(eventId) : readEvent(eventId))
+            : null
+    );
 
     let collab = $state<CollaborationRoom | null>(null);
+    let isFormDirty = $state(false);
+    let lockedUpdatedAt = $state<string | null>(null);
+    let formResetNonce = $state(0);
+
+    function handleFormDirtyChange(dirty: boolean) {
+        if (dirty && !isFormDirty) {
+            lockedUpdatedAt = String(eventQuery?.current?.updatedAt ?? "");
+        }
+        if (!dirty) {
+            lockedUpdatedAt = null;
+        }
+        isFormDirty = dirty;
+    }
+
+    async function refreshEventAndForm() {
+        isFormDirty = false;
+        lockedUpdatedAt = null;
+        formResetNonce += 1;
+        if (!eventQuery) return;
+        if (!preferLiveQuery()) {
+            await refreshRemoteResource(eventQuery);
+        } else if ('reconnect' in eventQuery && (eventQuery.error || eventQuery.done || !eventQuery.connected)) {
+            await eventQuery.reconnect();
+        }
+    }
 
     onMount(() => {
         if (!eventId) return;
@@ -63,9 +95,20 @@
                     email: user.email,
                     avatar: user.image ?? undefined
                 },
-                onRemoteChange: (change) => {
+                onRemoteChange: async (change) => {
                     const name = change.updatedBy?.name || change.updatedBy?.email || 'A collaborator';
-                    toast.info(`${name} updated this event.`);
+                    if (!isFormDirty) {
+                        room?.dismissRemoteChange();
+                        await refreshEventAndForm();
+                        toast.info(`${name} updated this event.`);
+                    } else {
+                        toast.info(`${name} updated this event while you are editing.`);
+                    }
+                },
+                onReconnect: async () => {
+                    if (!isFormDirty) {
+                        await refreshEventAndForm();
+                    }
                 }
             });
             collab = room;
@@ -83,7 +126,7 @@
 
 {#if browser}
     <svelte:boundary>
-        {#if deleteEventAction.pending || (eventQuery.loading && !eventQuery.current)}
+        {#if deleteEventAction.pending || !eventQuery || (eventQuery.loading && !eventQuery.current)}
             <LoadingSection message={m.loading_event_data()} />
         {:else if eventQuery.current}
             {@const event = eventQuery.current}
@@ -125,7 +168,10 @@
                                             onclick={async () => {
                                                 const ok = await handleDelete({
                                                     ids: [event.id],
-                                                    deleteFn: async (ids) => await deleteEventAction({ ids }),
+                                                    deleteFn: async (ids) => {
+                                                        markLocalEntityMutation("event", ids);
+                                                        return await deleteEventAction({ ids }).updates(listEvents, listEventsLive, readEvent, readEventLive);
+                                                    },
                                                 itemName: m.instance().toLowerCase(),
                                                 });
                                                 if (ok) await goto(getLastListUrl("events", "/events"));
@@ -140,15 +186,16 @@
                                                 onclick={async () => {
                                                     if (!confirm(m.delete_exception_confirm())) return;
                                                     try {
+                                                        markLocalEntityMutation("event", [event.id, eventId]);
                                                         const res = await deleteEventAction({
                                                             ids: [event.id],
                                                             deleteException: true,
-                                                        });
+                                                        }).updates(listEvents, listEventsLive, readEvent, readEventLive);
                                                         toast.success(m.exception_deleted());
                                                         const targetVirtualId = res?.revertedVirtualIds?.[0];
                                                         if (targetVirtualId) {
                                                             if (eventId === targetVirtualId) {
-                                                                await eventQuery.refresh();
+                                                                await refreshEventAndForm();
                                                             } else {
                                                                 await goto(`/events/${targetVirtualId}`);
                                                             }
@@ -171,7 +218,8 @@
                                             onclick={async () => {
                                                 if (!confirm(m.delete_series_confirm())) return;
                                                 try {
-                                                    await deleteEventAction({ ids: [event.id], deleteSeries: true });
+                                                    markLocalEntityMutation("event", [event.id, eventId]);
+                                                    await deleteEventAction({ ids: [event.id], deleteSeries: true }).updates(listEvents, listEventsLive, readEvent, readEventLive);
                                                     toast.success(m.series_deleted());
                                                     await goto(getLastListUrl("events", "/events"));
                                             } catch (err: any) {
@@ -196,7 +244,10 @@
                                     onclick={async () => {
                                         const ok = await handleDelete({
                                             ids: [event.id],
-                                            deleteFn: async (ids) => await deleteEventAction({ ids }),
+                                            deleteFn: async (ids) => {
+                                                markLocalEntityMutation("event", ids);
+                                                return await deleteEventAction({ ids }).updates(listEvents, listEventsLive, readEvent, readEventLive);
+                                            },
                                         itemName: m.event_label(),
                                         });
                                         if (ok) await goto(getLastListUrl("events", "/events"));
@@ -212,32 +263,35 @@
                         {#if collab}
                             <RemoteChangeBanner
                                 remoteChange={collab.remoteChange}
-                                onRefresh={async () => {
-                                    await readEvent(eventId).refresh();
-                                }}
+                                onRefresh={refreshEventAndForm}
                                 onDismiss={() => collab?.dismissRemoteChange()}
                             />
                         {/if}
 
                         <form
+                            oninput={() => handleFormDirtyChange(true)}
+                            onchange={() => handleFormDirtyChange(true)}
                             {...eventRf.preflight(updateEventSchema).enhance(async ({ submit }: any) => {
                                 try {
-                                    const result: any = await submit();
-                                    if (result?.error) {
-                                    toast.error(
-                                        result.error.message || m.something_went_wrong(),
-                                    );
+                                    markLocalEntityMutation("event", [event.id, eventId]);
+                                    const ok: any = await submit().updates(listEvents, listEventsLive, readEvent, readEventLive);
+                                    const result: any = (eventRf as any).result;
+                                    if (ok === false || result?.error || result?.success === false) {
+                                        toast.error(
+                                            result?.error?.message || result?.error || m.something_went_wrong(),
+                                        );
                                         return;
                                     }
+                                    handleFormDirtyChange(false);
                                     toast.success(m.successfully_saved());
-                                    goto(getLastListUrl("events", "/events"));
-                            } catch (error: any) {
+                                    await goto(getLastListUrl("events", "/events"));
+                                } catch (error: any) {
                                     toast.error(error?.message || m.something_went_wrong());
                                 }
                             })}
                             class="space-y-6"
                         >
-                            {#key event.id}
+                            {#key `${event.id}:${isFormDirty ? (lockedUpdatedAt ?? "") : String(event.updatedAt ?? "")}:${formResetNonce}`}
                                 <EventForm
                                     remoteFunction={eventRf}
                                     validationSchema={updateEventSchema}

@@ -548,12 +548,12 @@ export async function revertMaterializedExceptions(params: {
 		await syncService.syncItems(userId, [masterId], 'event').catch(console.error);
 	}
 
-	// 9. Notify subscribers and invalidate cached event/list entries
+	// 9. Invalidate cached event/list entries first, then notify subscribers
+	await invalidateEvent([...exceptionIds, ...affectedMasterIds, ...revertedVirtualIds]);
 	await publishEventChange('delete', exceptionIds).catch(console.error);
 	if (affectedMasterIds.length > 0) {
 		await publishEventChange('update', affectedMasterIds).catch(console.error);
 	}
-	await invalidateEvent([...exceptionIds, ...affectedMasterIds, ...revertedVirtualIds]);
 
 	return {
 		deletedIds: exceptionIds,

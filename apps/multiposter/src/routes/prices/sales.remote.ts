@@ -18,8 +18,8 @@ import {
     removeEventSaleRecord,
     scanPrintedPriceListWithGemini,
 } from '#lib/server/events/sales.js';
-import { readEvent } from '../events/[id]/read.remote.js';
 import { listConsumables } from '../consumables/list.remote.js';
+import { commitEventChange } from '#lib/server/events/sync-commit.js';
 
 export const getEventShoppingList = query(getEventShoppingListSchema, async (data) => {
     const user = getAuthenticatedUser();
@@ -33,6 +33,23 @@ export const getEventSales = query(getEventSalesSchema, async (data) => {
     return getEventSalesAndFinancials(data);
 });
 
+async function refreshSalesRelatedQueries(eventId: string, user?: { id: string; name?: string | null; email?: string | null }) {
+    await commitEventChange({
+        action: 'update',
+        ids: [eventId],
+        user,
+        extraRefresh: async () => {
+            try { await requested(getEventSales, 20).refreshAll(); } catch { /* ignore */ }
+            try { await requested(getEventShoppingList, 20).refreshAll(); } catch { /* ignore */ }
+            try { await requested(listConsumables, 20).refreshAll(); } catch { /* ignore */ }
+            void getEventSales({ eventId }).refresh();
+            void getEventShoppingList({ eventId }).refresh();
+            void listConsumables().refresh();
+            void listConsumables({}).refresh();
+        }
+    });
+}
+
 export const recordSalesCommand = command(recordEventSalesSchema, async (data) => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'events');
@@ -42,15 +59,7 @@ export const recordSalesCommand = command(recordEventSalesSchema, async (data) =
         userId: user.id,
     });
 
-    try { await requested(getEventSales, 20).refreshAll(); } catch { /* ignore */ }
-    try { await requested(getEventShoppingList, 20).refreshAll(); } catch { /* ignore */ }
-    try { await requested(listConsumables, 20).refreshAll(); } catch { /* ignore */ }
-    void getEventSales({ eventId: data.eventId }).refresh();
-    void getEventShoppingList({ eventId: data.eventId }).refresh();
-    void listConsumables().refresh();
-    void listConsumables({}).refresh();
-    void readEvent(data.eventId).refresh();
-
+    await refreshSalesRelatedQueries(data.eventId, user);
     return result;
 });
 
@@ -60,15 +69,7 @@ export const deleteSaleCommand = command(deleteEventSaleSchema, async (data) => 
 
     const result = await removeEventSaleRecord(data);
 
-    try { await requested(getEventSales, 20).refreshAll(); } catch { /* ignore */ }
-    try { await requested(getEventShoppingList, 20).refreshAll(); } catch { /* ignore */ }
-    try { await requested(listConsumables, 20).refreshAll(); } catch { /* ignore */ }
-    void getEventSales({ eventId: data.eventId }).refresh();
-    void getEventShoppingList({ eventId: data.eventId }).refresh();
-    void listConsumables().refresh();
-    void listConsumables({}).refresh();
-    void readEvent(data.eventId).refresh();
-
+    await refreshSalesRelatedQueries(data.eventId, user);
     return result;
 });
 
@@ -82,15 +83,7 @@ export const restockEventShoppingList = command(restockShoppingListItemsSchema, 
         userId: user.id,
     });
 
-    try { await requested(getEventShoppingList, 20).refreshAll(); } catch { /* ignore */ }
-    try { await requested(getEventSales, 20).refreshAll(); } catch { /* ignore */ }
-    try { await requested(listConsumables, 20).refreshAll(); } catch { /* ignore */ }
-    void getEventShoppingList({ eventId: data.eventId }).refresh();
-    void getEventSales({ eventId: data.eventId }).refresh();
-    void listConsumables().refresh();
-    void listConsumables({}).refresh();
-    void readEvent(data.eventId).refresh();
-
+    await refreshSalesRelatedQueries(data.eventId, user);
     return result;
 });
 

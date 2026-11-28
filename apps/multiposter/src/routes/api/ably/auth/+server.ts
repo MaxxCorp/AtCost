@@ -20,9 +20,13 @@ async function handleAuth(event: Parameters<RequestHandler>[0]) {
     try {
         const user = event.locals.user;
         const requestedClientId = event.url.searchParams.get('clientId');
-        
-        // Use authenticated user ID, or fallback to requested clientId, or generate anonymous ID
-        const clientId = user?.id || requestedClientId || `anon-${crypto.randomUUID()}`;
+        const rawTabId = event.url.searchParams.get('tabId');
+        const sanitizedTabId = rawTabId ? rawTabId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32) : '';
+
+        // Include tab suffix so multiple open tabs for the same user stay distinguishable
+        const clientId = user?.id
+            ? (sanitizedTabId ? `${user.id}:${sanitizedTabId}` : user.id)
+            : requestedClientId || (sanitizedTabId ? `anon-${sanitizedTabId}` : `anon-${crypto.randomUUID()}`);
 
         const tokenParams: Ably.TokenParams = {
             clientId

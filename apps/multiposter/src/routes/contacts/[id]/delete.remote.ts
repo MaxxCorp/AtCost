@@ -6,10 +6,9 @@ import { inArray, and, eq } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { listContacts } from '../list.remote';
 import { fetchEntityContacts } from '../associate.remote';
-import { readEvent } from '../../events/[id]/read.remote';
-import { listEvents } from '../../events/list.remote';
 import { getStorageProvider } from '#lib/server/blob-storage/index.js';
-import { invalidateContact, invalidateEvent } from '#lib/server/cache/index.js';
+import { invalidateContact } from '#lib/server/cache/index.js';
+import { commitEventChange } from '#lib/server/events/sync-commit.js';
 import { applyEventParticipantsDelta, getEventHeadcountsByContactIds } from '#lib/server/events/participants.js';
 
 const deleteContactsSchema = v.array(v.string());
@@ -56,20 +55,18 @@ export const deleteContact = command(deleteContactsSchema, async (ids) => {
 
     await invalidateContact(deletedIds);
     if (affectedEventIds.length > 0) {
-        await invalidateEvent(affectedEventIds);
-        for (const evtId of affectedEventIds) {
-            void readEvent(evtId).refresh();
-        }
+        await commitEventChange({
+            action: 'update',
+            ids: affectedEventIds,
+            user
+        });
     }
     try {
         await requested(listContacts, 20).refreshAll();
         await requested(fetchEntityContacts, 20).refreshAll();
-        await requested(listEvents, 20).refreshAll();
     } catch { /* ignore */ }
     void listContacts().refresh();
     void listContacts({}).refresh();
-    void listEvents().refresh();
-    void listEvents({}).refresh();
     return { count: result.length, ids: deletedIds };
 });
 

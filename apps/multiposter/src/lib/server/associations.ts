@@ -32,6 +32,8 @@ export async function addAssociation(options: AssociationOptions) {
         [entityField]: entityId,
         [itemField]: itemId
     }).onConflictDoNothing();
+
+    return entityId;
 }
 
 /**
@@ -54,5 +56,7 @@ export async function removeAssociation(options: AssociationOptions) {
         eq((table as any)[entityField], entityId),
         eq((table as any)[itemField], itemId)
     ));
+
+    return entityId;
 }
 

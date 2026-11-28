@@ -28,6 +28,8 @@
     import { toast } from "svelte-sonner";
     import { sortItemsList, sortHierarchically } from "../utils/hierarchy.js";
     import { getPreference, setPreference } from "../utils/idb.js";
+    import { usePromiseOrRemoteQuery } from "../hooks/remoteQueryState.svelte.js";
+    import { markLocalEntityMutation } from "../hooks/realtimeSync.svelte.js";
     import BulkActionToolbar from "./BulkActionToolbar.svelte";
 
     interface Props<T extends { id?: string | null; name?: string }> {
@@ -58,6 +60,7 @@
             itemId: string;
         }) => Promise<any>;
         deleteItemRemote?: (ids: string[]) => Promise<any>;
+        relatedQueries?: any[];
 
         // Filters
         filterGroups?: FilterGroup[];
@@ -152,6 +155,7 @@
         addAssociationRemote,
         removeAssociationRemote,
         deleteItemRemote,
+        relatedQueries = [],
         filterGroups = undefined,
         filterAssociations = undefined,
         filters = undefined,
@@ -279,40 +283,36 @@
     let searchQuery = $state("");
     let selectorSearchQuery = $state("");
     let activeFilters = $state<FilterStateMap>({});
-    let initialPrefLoaded = $state(false);
     const effectivePreferenceKey = $derived(
         preferenceKey ?? (title ? `em_filters_${title.toLowerCase().replace(/[^a-z0-9]/g, '_')}` : undefined)
     );
+
+    function persistActiveFilters(nextFilters: FilterStateMap) {
+        activeFilters = nextFilters;
+        if (effectivePreferenceKey) {
+            void setPreference(effectivePreferenceKey, $state.snapshot(nextFilters)).catch((err) => {
+                console.warn("Failed to persist filter preferences", err);
+            });
+        }
+    }
 
     onMount(() => {
         mounted = true;
         if (effectivePreferenceKey) {
             getPreference<FilterStateMap | null>(effectivePreferenceKey, null)
                 .then((saved) => {
-                    if (saved && typeof saved === "object") {
+                    if (mounted && saved && typeof saved === "object") {
                         activeFilters = saved;
                     }
                 })
                 .catch((err) => {
                     console.warn("Failed to load filter preferences", err);
-                })
-                .finally(() => {
-                    initialPrefLoaded = true;
                 });
-        } else {
-            initialPrefLoaded = true;
         }
 
         return () => {
             mounted = false;
         };
-    });
-
-    $effect(() => {
-        if (initialPrefLoaded && effectivePreferenceKey) {
-            const snap = $state.snapshot(activeFilters);
-            void setPreference(effectivePreferenceKey, snap);
-        }
     });
 
     const allFilterGroups = $derived<FilterGroup[]>([
@@ -459,12 +459,15 @@
     }
 
     // --- STATE ---
-    let localAssociatedItems = $state<T[]>(untrack(() => initialItems ?? []));
+    let localAssociatedItems = $derived.by<T[]>(() => {
+        void entityId;
+        return untrack(() => initialItems ?? []);
+    });
     let showSelector = $state(false);
-    let refreshTrigger = $state(0);
+    let plainRefreshTick = $state(0);
 
     const associationsQuery = $derived.by(() => {
-        void refreshTrigger;
+        void plainRefreshTick;
         if (entityId && type) {
             if (fetchAssociationsRemote) {
                 return invokeRemote(fetchAssociationsRemote, { type, entityId });
@@ -479,146 +482,54 @@
     });
 
     const selectorListQuery = $derived.by(() => {
-        void refreshTrigger;
+        void plainRefreshTick;
         if (isStandalone || showSelector) {
             return invokeRemote(listItemsRemote, filterState);
         }
         return null;
     });
 
-    let plainAssociationsData = $state<any>(null);
-    let plainAssociationsLoading = $state(false);
-    let plainAssociationsError = $state<any>(null);
-
-    $effect(() => {
-        const q = associationsQuery;
-        if (!q) {
-            plainAssociationsData = null;
-            plainAssociationsLoading = false;
-            plainAssociationsError = null;
-            return;
-        }
-        if ('current' in q) {
-            return;
-        }
-        if (typeof q.then === 'function') {
-            plainAssociationsLoading = true;
-            plainAssociationsError = null;
-            q.then((val: any) => {
-                if (associationsQuery === q) {
-                    plainAssociationsData = val;
-                    plainAssociationsLoading = false;
-                }
-            }).catch((err: any) => {
-                if (associationsQuery === q) {
-                    plainAssociationsError = err;
-                    plainAssociationsLoading = false;
-                }
-            });
-        } else {
-            plainAssociationsData = q;
-            plainAssociationsLoading = false;
-        }
-    });
-
-    let plainSelectorData = $state<any>(null);
-    let plainSelectorLoading = $state(false);
-    let plainSelectorError = $state<any>(null);
-
-    $effect(() => {
-        const q = selectorListQuery;
-        if (!q) {
-            plainSelectorData = null;
-            plainSelectorLoading = false;
-            plainSelectorError = null;
-            return;
-        }
-        if ('current' in q) {
-            return;
-        }
-        if (typeof q.then === 'function') {
-            plainSelectorLoading = true;
-            plainSelectorError = null;
-            q.then((val: any) => {
-                if (selectorListQuery === q) {
-                    plainSelectorData = val;
-                    plainSelectorLoading = false;
-                }
-            }).catch((err: any) => {
-                if (selectorListQuery === q) {
-                    plainSelectorError = err;
-                    plainSelectorLoading = false;
-                }
-            });
-        } else {
-            plainSelectorData = q;
-            plainSelectorLoading = false;
-        }
-    });
+    const associationsState = usePromiseOrRemoteQuery<any>(() => associationsQuery);
+    const selectorListState = usePromiseOrRemoteQuery<any>(() => selectorListQuery);
 
     const rawAssociations = $derived.by<T[]>(() => {
         if (!entityId || !type) {
             return localAssociatedItems;
         }
-        let list: T[] | null = null;
-        if (associationsQuery && 'current' in associationsQuery) {
-            if (associationsQuery.current !== undefined && associationsQuery.current !== null) {
-                list = normalize<T>(associationsQuery.current).data;
-            }
-        } else if (plainAssociationsData !== null && plainAssociationsData !== undefined) {
-            list = normalize<T>(plainAssociationsData).data;
-        }
-
-        if (list !== null) {
-            return list;
+        const current = associationsState.current;
+        if (current !== undefined && current !== null) {
+            return normalize<T>(current).data;
         }
         return localAssociatedItems;
     });
 
     const isAssociationsLoading = $derived.by(() => {
         if (!entityId || !type || !associationsQuery) return false;
-        if ('loading' in associationsQuery) {
-            return Boolean(associationsQuery.loading && associationsQuery.current === undefined && localAssociatedItems.length === 0);
-        }
-        return plainAssociationsLoading && localAssociatedItems.length === 0;
+        return associationsState.loading && localAssociatedItems.length === 0;
     });
 
     const associationsError = $derived.by(() => {
         if (!entityId || !type || !associationsQuery) return null;
-        if ('error' in associationsQuery) {
-            return associationsQuery.error;
-        }
-        return plainAssociationsError;
+        return associationsState.error;
     });
 
     const rawSelectorData = $derived.by<T[]>(() => {
         if (!selectorListQuery) return [];
-        if ('current' in selectorListQuery) {
-            if (selectorListQuery.current !== undefined && selectorListQuery.current !== null) {
-                return normalize<T>(selectorListQuery.current).data;
-            }
-            return [];
-        }
-        if (plainSelectorData !== null && plainSelectorData !== undefined) {
-            return normalize<T>(plainSelectorData).data;
+        const current = selectorListState.current;
+        if (current !== undefined && current !== null) {
+            return normalize<T>(current).data;
         }
         return [];
     });
 
     const isSelectorLoading = $derived.by(() => {
         if (!selectorListQuery) return false;
-        if ('loading' in selectorListQuery) {
-            return Boolean(selectorListQuery.loading && selectorListQuery.current === undefined);
-        }
-        return plainSelectorLoading;
+        return selectorListState.loading;
     });
 
     const selectorError = $derived.by(() => {
         if (!selectorListQuery) return null;
-        if ('error' in selectorListQuery) {
-            return selectorListQuery.error;
-        }
-        return plainSelectorError;
+        return selectorListState.error;
     });
 
     const isDisplayedLoading = $derived(
@@ -687,25 +598,43 @@
             : filtered;
     });
 
+    function isRefreshableQuery(q: any): boolean {
+        return Boolean(q && typeof q === 'object' && (typeof q.refresh === 'function' || typeof q.reconnect === 'function'));
+    }
+
     async function refreshAssociations() {
-        refreshTrigger++;
         if (associationsQuery && typeof associationsQuery.refresh === 'function') {
             try {
                 await associationsQuery.refresh();
             } catch (e) {
                 console.warn("associationsQuery refresh error:", e);
             }
+        } else if (associationsQuery && typeof associationsQuery.reconnect === 'function') {
+            try {
+                await associationsQuery.reconnect();
+            } catch (e) {
+                console.warn("associationsQuery reconnect error:", e);
+            }
+        } else {
+            plainRefreshTick++;
         }
     }
 
     async function refreshSelector() {
-        refreshTrigger++;
         if (selectorListQuery && typeof selectorListQuery.refresh === 'function') {
             try {
                 await selectorListQuery.refresh();
             } catch (e) {
                 console.warn("selectorListQuery refresh error:", e);
             }
+        } else if (selectorListQuery && typeof selectorListQuery.reconnect === 'function') {
+            try {
+                await selectorListQuery.reconnect();
+            } catch (e) {
+                console.warn("selectorListQuery reconnect error:", e);
+            }
+        } else {
+            plainRefreshTick++;
         }
     }
 
@@ -713,30 +642,24 @@
         await Promise.all([refreshAssociations(), refreshSelector()]);
     }
 
-    let prevEntityId = $state(entityId);
-    $effect(() => {
-        if (entityId !== prevEntityId) {
-            prevEntityId = entityId;
-            localAssociatedItems = initialItems ?? [];
+    function withRelatedUpdates<R>(commandPromise: Promise<R> & { updates?: (...u: any[]) => Promise<R> }): Promise<R> {
+        if (!commandPromise || typeof commandPromise.updates !== 'function') {
+            return commandPromise;
         }
-    });
-
-    let prevAssociationsKey = $state<string | null>(null);
-    $effect(() => {
-        const items = currentAssociations;
-        if (onchange && items) {
-            const ids = items.map((i) => i.id!).filter(Boolean);
-            const key = items
-                .map((i: any) => `${i.id}:${i.partySize ?? 1}:${i.participationStatus ?? ''}`)
-                .join(',');
-            if (prevAssociationsKey !== null && prevAssociationsKey !== key) {
-                prevAssociationsKey = key;
-                onchange(ids, items);
-            } else if (prevAssociationsKey === null) {
-                prevAssociationsKey = key;
+        const updates: any[] = [];
+        if (isRefreshableQuery(associationsQuery)) {
+            updates.push(associationsQuery);
+        }
+        if (isRefreshableQuery(selectorListQuery)) {
+            updates.push(selectorListQuery);
+        }
+        for (const q of relatedQueries) {
+            if (q && !updates.includes(q)) {
+                updates.push(q);
             }
         }
-    });
+        return updates.length > 0 ? commandPromise.updates(...updates) : commandPromise;
+    }
 
     function toggleSelector() {
         showSelector = !showSelector;
@@ -750,64 +673,10 @@
     let editingItem = $state<any | null>(null);
 
     const editItemQuery = $derived(editingItem?.id && readItemRemote ? invokeRemote(readItemRemote, editingItem.id) : null);
-    let plainEditItemData = $state<any>(null);
-    let plainEditItemLoading = $state(false);
-    let plainEditItemError = $state<any>(null);
-
-    $effect(() => {
-        const q = editItemQuery;
-        if (!q) {
-            plainEditItemData = null;
-            plainEditItemLoading = false;
-            plainEditItemError = null;
-            return;
-        }
-        if ('current' in q) {
-            return;
-        }
-        if (typeof q.then === 'function') {
-            plainEditItemLoading = true;
-            plainEditItemError = null;
-            q.then((val: any) => {
-                if (editItemQuery === q) {
-                    plainEditItemData = val;
-                    plainEditItemLoading = false;
-                }
-            }).catch((err: any) => {
-                if (editItemQuery === q) {
-                    plainEditItemError = err;
-                    plainEditItemLoading = false;
-                }
-            });
-        } else {
-            plainEditItemData = q;
-            plainEditItemLoading = false;
-        }
-    });
-
-    const editItemData = $derived.by(() => {
-        if (!editItemQuery) return null;
-        if ('current' in editItemQuery) {
-            return editItemQuery.current ?? null;
-        }
-        return plainEditItemData;
-    });
-
-    const isEditItemLoading = $derived.by(() => {
-        if (!editItemQuery) return false;
-        if ('loading' in editItemQuery) {
-            return Boolean(editItemQuery.loading && editItemQuery.current === undefined);
-        }
-        return plainEditItemLoading;
-    });
-
-    const editItemError = $derived.by(() => {
-        if (!editItemQuery) return null;
-        if ('error' in editItemQuery) {
-            return editItemQuery.error;
-        }
-        return plainEditItemError;
-    });
+    const editItemState = usePromiseOrRemoteQuery<any>(() => editItemQuery);
+    const editItemData = $derived(editItemQuery ? (editItemState.current ?? null) : null);
+    const isEditItemLoading = $derived(editItemQuery ? editItemState.loading : false);
+    const editItemError = $derived(editItemQuery ? editItemState.error : null);
 
     function isAssociated(item: T, list: T[]) {
         if (!item || !list || !Array.isArray(list)) return false;
@@ -831,11 +700,14 @@
                     return true;
                 });
                 if (entityId && removeAssociationRemote) {
-                    await removeAssociationRemote({
-                        type,
-                        entityId,
-                        itemId: item.id!,
-                    });
+                    markLocalEntityMutation(type || 'entity', [entityId]);
+                    await withRelatedUpdates(
+                        removeAssociationRemote({
+                            type,
+                            entityId,
+                            itemId: item.id!,
+                        })
+                    );
                 }
                 localAssociatedItems = newList;
                 await refreshAssociations();
@@ -844,22 +716,28 @@
                 if (singleSelect) {
                     const newList = [item];
                     if (entityId && removeAssociationRemote) {
+                        markLocalEntityMutation(type || 'entity', [entityId]);
                         for (const existing of currentList) {
                             if (existing.id) {
-                                await removeAssociationRemote({
-                                    type,
-                                    entityId,
-                                    itemId: existing.id,
-                                });
+                                await withRelatedUpdates(
+                                    removeAssociationRemote({
+                                        type,
+                                        entityId,
+                                        itemId: existing.id,
+                                    })
+                                );
                             }
                         }
                     }
                     if (entityId && addAssociationRemote) {
-                        await addAssociationRemote({
-                            type,
-                            entityId,
-                            itemId: item.id!,
-                        });
+                        markLocalEntityMutation(type || 'entity', [entityId]);
+                        await withRelatedUpdates(
+                            addAssociationRemote({
+                                type,
+                                entityId,
+                                itemId: item.id!,
+                            })
+                        );
                     }
                     localAssociatedItems = newList;
                     await refreshAssociations();
@@ -868,11 +746,14 @@
                 } else {
                     const newList = [...currentList, item];
                     if (entityId && addAssociationRemote) {
-                        await addAssociationRemote({
-                            type,
-                            entityId,
-                            itemId: item.id!,
-                        });
+                        markLocalEntityMutation(type || 'entity', [entityId]);
+                        await withRelatedUpdates(
+                            addAssociationRemote({
+                                type,
+                                entityId,
+                                itemId: item.id!,
+                            })
+                        );
                     }
                     localAssociatedItems = newList;
                     await refreshAssociations();
@@ -896,7 +777,7 @@
         if (!item.id || !canDelete || !deleteItemRemote) return;
         deletingItemId = item.id;
         try {
-            const result = await invokeRemote(deleteItemRemote, [item.id]);
+            const result = await withRelatedUpdates(invokeRemote(deleteItemRemote, [item.id]));
             const success =
                 result === true || (result && result.success !== false);
             if (!success) return;
@@ -934,7 +815,7 @@
         const confirmMsg = `${i18n.deleteConfirmLabel || "Delete selected items?"} (${selectedIds.length})`;
         if (!window.confirm(confirmMsg)) return;
         try {
-            await invokeRemote(deleteItemRemote, selectedIds);
+            await withRelatedUpdates(invokeRemote(deleteItemRemote, selectedIds));
             toast.success(i18n.deleteSuccessLabel || "Deleted successfully");
             const idsToDelete = new Set(selectedIds);
             const remaining = currentAssociations.filter((i) => !i.id || !idsToDelete.has(i.id));
@@ -983,13 +864,16 @@
 
             if (singleSelect && entityId && removeAssociationRemote) {
                 try {
+                    markLocalEntityMutation(type || 'entity', [entityId]);
                     for (const existing of currentList) {
                         if (existing.id && existing.id !== newId) {
-                            await removeAssociationRemote({
-                                type,
-                                entityId,
-                                itemId: existing.id,
-                            });
+                            await withRelatedUpdates(
+                                removeAssociationRemote({
+                                    type,
+                                    entityId,
+                                    itemId: existing.id,
+                                })
+                            );
                         }
                     }
                 } catch (err: any) {
@@ -1000,11 +884,14 @@
 
             if (entityId && addAssociationRemote) {
                 try {
-                    await addAssociationRemote({
-                        type,
-                        entityId,
-                        itemId: newId,
-                    });
+                    markLocalEntityMutation(type || 'entity', [entityId]);
+                    await withRelatedUpdates(
+                        addAssociationRemote({
+                            type,
+                            entityId,
+                            itemId: newId,
+                        })
+                    );
                 } catch (err: any) {
                     toast.error(err.message || i18n.updateAssociationFailedLabel);
                     return;
@@ -1105,6 +992,8 @@
                     booleanFilters={booleanFilters}
                     radioGroups={radioGroups}
                     buttonLabel={i18n.filtersLabel}
+                    onfilterchange={(f) => persistActiveFilters(f)}
+                    onclear={() => persistActiveFilters(activeFilters)}
                 />
             {/if}
 
@@ -1173,20 +1062,20 @@
             clearAllLabel={i18n.clearAllLabel}
             onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
                 const current = activeFilters[groupId] || { include: [], exclude: [] };
-                activeFilters = {
+                persistActiveFilters({
                     ...activeFilters,
                     [groupId]: {
                         include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
                         exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
                     },
-                };
+                });
             }}
             onclearall={() => {
                 const reset: FilterStateMap = {};
                 for (const g of allFilterGroups) {
                     reset[g.id] = { include: [], exclude: [] };
                 }
-                activeFilters = reset;
+                persistActiveFilters(reset);
             }}
         />
     {/if}
@@ -1219,6 +1108,8 @@
                         booleanFilters={booleanFilters}
                         radioGroups={radioGroups}
                         buttonLabel={i18n.filtersLabel}
+                        onfilterchange={(f) => persistActiveFilters(f)}
+                        onclear={() => persistActiveFilters(activeFilters)}
                     />
                 {/if}
             </div>
@@ -1232,20 +1123,20 @@
                     clearAllLabel={i18n.clearAllLabel}
                     onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
                         const current = activeFilters[groupId] || { include: [], exclude: [] };
-                        activeFilters = {
+                        persistActiveFilters({
                             ...activeFilters,
                             [groupId]: {
                                 include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
                                 exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
                             },
-                        };
+                        });
                     }}
                     onclearall={() => {
                         const reset: FilterStateMap = {};
                         for (const g of allFilterGroups) {
                             reset[g.id] = { include: [], exclude: [] };
                         }
-                        activeFilters = reset;
+                        persistActiveFilters(reset);
                     }}
                 />
             {/if}

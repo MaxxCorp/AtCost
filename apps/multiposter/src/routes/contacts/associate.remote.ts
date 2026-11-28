@@ -14,11 +14,10 @@ import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssoci
 import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
 import { applyEventParticipantsDelta } from '#lib/server/events/participants.js';
 import { getContactHeadcount } from '#lib/utils/participants.js';
-import { readEvent } from '../events/[id]/read.remote.js';
-import { listEvents } from '../events/list.remote.js';
 import { readAnnouncement } from '../announcements/[id]/read.remote.js';
 import { readLocation } from '../locations/[id]/read.remote.js';
-import { invalidateEvent, invalidateAnnouncement, invalidateLocation } from '#lib/server/cache/index.js';
+import { invalidateAnnouncement, invalidateLocation } from '#lib/server/cache/index.js';
+import { commitEventChange } from '#lib/server/events/sync-commit.js';
 import { syncService } from '#lib/server/sync/service.js';
 
 const tableMap = {
@@ -85,14 +84,16 @@ export const addAssociation = command(associationSchema, async (data) => {
     }
 
     if (type === 'event') {
-        await invalidateEvent(targetEventId !== entityId ? [entityId, targetEventId] : entityId);
-        void readEvent(entityId).refresh();
-        if (targetEventId !== entityId) {
-            void readEvent(targetEventId).refresh();
-        }
-        try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
-        void listEvents().refresh();
-        void listEvents({}).refresh();
+        await commitEventChange({
+            action: 'update',
+            ids: [entityId, targetEventId],
+            user,
+            extraRefresh: async () => {
+                try { await requested(fetchEntityContacts, 20).refreshAll(); } catch { /* ignore */ }
+                await fetchEntityContacts({ type, entityId }).refresh();
+            }
+        });
+        return { success: true };
     } else if (type === 'announcement') {
         await invalidateAnnouncement(entityId);
         void readAnnouncement(entityId).refresh();
@@ -158,14 +159,16 @@ export const removeAssociation = command(associationSchema, async (data) => {
     }
 
     if (type === 'event') {
-        await invalidateEvent(targetEventId !== entityId ? [entityId, targetEventId] : entityId);
-        void readEvent(entityId).refresh();
-        if (targetEventId !== entityId) {
-            void readEvent(targetEventId).refresh();
-        }
-        try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
-        void listEvents().refresh();
-        void listEvents({}).refresh();
+        await commitEventChange({
+            action: 'update',
+            ids: [entityId, targetEventId],
+            user,
+            extraRefresh: async () => {
+                try { await requested(fetchEntityContacts, 20).refreshAll(); } catch { /* ignore */ }
+                await fetchEntityContacts({ type, entityId }).refresh();
+            }
+        });
+        return { success: true };
     } else if (type === 'announcement') {
         await invalidateAnnouncement(entityId);
         void readAnnouncement(entityId).refresh();
@@ -230,14 +233,16 @@ export const updateAssociationStatus = command(updateAssociationSchema, async (d
     }
 
     if (type === 'event') {
-        await invalidateEvent(targetEntityId !== entityId ? [entityId, targetEntityId] : entityId);
-        void readEvent(entityId).refresh();
-        if (targetEntityId !== entityId) {
-            void readEvent(targetEntityId).refresh();
-        }
-        try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
-        void listEvents().refresh();
-        void listEvents({}).refresh();
+        await commitEventChange({
+            action: 'update',
+            ids: [entityId, targetEntityId],
+            user,
+            extraRefresh: async () => {
+                try { await requested(fetchEntityContacts, 20).refreshAll(); } catch { /* ignore */ }
+                await fetchEntityContacts({ type, entityId }).refresh();
+            }
+        });
+        return { success: true };
     }
     try { await requested(fetchEntityContacts, 20).refreshAll(); } catch { /* ignore */ }
     await fetchEntityContacts({ type, entityId }).refresh();
@@ -292,17 +297,15 @@ export const updateAssociationPartySize = command(updateAssociationPartySizeSche
         }
     }
 
-    await invalidateEvent(entityId);
-    if (targetEntityId !== entityId) {
-        await invalidateEvent(targetEntityId);
-        void readEvent(targetEntityId).refresh();
-    }
-    void readEvent(entityId).refresh();
-    try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
-    void listEvents().refresh();
-    void listEvents({}).refresh();
-    try { await requested(fetchEntityContacts, 20).refreshAll(); } catch { /* ignore */ }
-    await fetchEntityContacts({ type, entityId }).refresh();
+    await commitEventChange({
+        action: 'update',
+        ids: [entityId, targetEntityId],
+        user,
+        extraRefresh: async () => {
+            try { await requested(fetchEntityContacts, 20).refreshAll(); } catch { /* ignore */ }
+            await fetchEntityContacts({ type, entityId }).refresh();
+        }
+    });
     return { success: true, partySize: clampedSize };
 });
 
@@ -348,12 +351,20 @@ export const updateContactRoles = command(updateContactRolesSchema, async (data)
             );
         }
 
-        await invalidateEvent(targetEntityId);
-        void readEvent(targetEntityId).refresh();
-
         if (user?.id) {
             await syncService.syncContactAssociationsChange(user.id, targetEntityId, contactId, 'role_update');
         }
+
+        await commitEventChange({
+            action: 'update',
+            ids: [rawEntityId, targetEntityId],
+            user,
+            extraRefresh: async () => {
+                try { await requested(fetchEntityContacts, 20).refreshAll(); } catch { /* ignore */ }
+                await fetchEntityContacts({ type, entityId: targetEntityId }).refresh();
+            }
+        });
+        return { success: true };
     } else if (type === 'announcement') {
         await db.delete(announcementContactRole).where(and(
             eq(announcementContactRole.announcementId, targetEntityId),

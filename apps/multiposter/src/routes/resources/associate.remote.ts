@@ -7,8 +7,7 @@ import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js
 import { resourceAssociationSchema, getResourceAssociationsSchema } from '@ac/validations';
 import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '#lib/server/associations.js';
 import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
-import { invalidateEvent } from '#lib/server/cache/index.js';
-import { readEvent } from '../events/[id]/read.remote.js';
+import { commitEventChange } from '#lib/server/events/sync-commit.js';
 import { syncService } from '#lib/server/sync/service.js';
 
 const tableMap = {
@@ -31,7 +30,7 @@ export const addResourceAssociation = command(resourceAssociationSchema, async (
 
     const { type, entityId, resourceId } = data;
     
-    await dbAddAssociation({
+    const resolvedEntityId = await dbAddAssociation({
         type,
         entityId,
         itemId: resourceId,
@@ -42,17 +41,26 @@ export const addResourceAssociation = command(resourceAssociationSchema, async (
     });
     
     if (type === 'event') {
-        await invalidateEvent(entityId);
-        void readEvent(entityId).refresh();
         if (user?.id) {
-            await syncService.syncResourceAssociationsChange(user.id, entityId, resourceId, 'link');
+            await syncService.syncResourceAssociationsChange(user.id, resolvedEntityId, resourceId, 'link');
         }
+        await commitEventChange({
+            action: 'update',
+            ids: [entityId, resolvedEntityId],
+            user,
+            extraRefresh: async () => {
+                try {
+                    await requested(fetchEntityResources, 20).refreshAll();
+                } catch { /* ignore */ }
+                await fetchEntityResources({ type, entityId }).refresh();
+            }
+        });
+    } else {
+        try {
+            await requested(fetchEntityResources, 20).refreshAll();
+        } catch { /* ignore */ }
+        await fetchEntityResources({ type, entityId }).refresh();
     }
-
-    try {
-        await requested(fetchEntityResources, 20).refreshAll();
-    } catch { /* ignore */ }
-    await fetchEntityResources({ type, entityId }).refresh();
     return { success: true };
 });
 
@@ -62,7 +70,7 @@ export const removeResourceAssociation = command(resourceAssociationSchema, asyn
 
     const { type, entityId, resourceId } = data;
     
-    await dbRemoveAssociation({
+    const resolvedEntityId = await dbRemoveAssociation({
         type,
         entityId,
         itemId: resourceId,
@@ -73,17 +81,26 @@ export const removeResourceAssociation = command(resourceAssociationSchema, asyn
     });
     
     if (type === 'event') {
-        await invalidateEvent(entityId);
-        void readEvent(entityId).refresh();
         if (user?.id) {
-            await syncService.syncResourceAssociationsChange(user.id, entityId, resourceId, 'unlink');
+            await syncService.syncResourceAssociationsChange(user.id, resolvedEntityId, resourceId, 'unlink');
         }
+        await commitEventChange({
+            action: 'update',
+            ids: [entityId, resolvedEntityId],
+            user,
+            extraRefresh: async () => {
+                try {
+                    await requested(fetchEntityResources, 20).refreshAll();
+                } catch { /* ignore */ }
+                await fetchEntityResources({ type, entityId }).refresh();
+            }
+        });
+    } else {
+        try {
+            await requested(fetchEntityResources, 20).refreshAll();
+        } catch { /* ignore */ }
+        await fetchEntityResources({ type, entityId }).refresh();
     }
-
-    try {
-        await requested(fetchEntityResources, 20).refreshAll();
-    } catch { /* ignore */ }
-    await fetchEntityResources({ type, entityId }).refresh();
     return { success: true };
 });
 

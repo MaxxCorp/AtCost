@@ -1,4 +1,9 @@
 import { browser } from '$app/env';
+import { getTabClientId, isOwnRecentMutation } from '@ac/ui';
+import {
+    getRealtimeCapability,
+    getSharedAblyClient
+} from '../realtime/client.svelte';
 import { getCollaboratorColor } from './colors';
 import type {
     Collaborator,
@@ -20,74 +25,7 @@ export interface CollaborationOptions {
     entityId: string;
     currentUser: UserSessionProfile;
     onRemoteChange?: (change: EntityChangeMessage) => void;
-}
-
-interface RealtimeCapability {
-    provider: 'sse' | 'ably' | 'polling' | 'none';
-    ablyConfigured: boolean;
-    isPermanentServer: boolean;
-    pollingEnabled: boolean;
-    reason?: string;
-}
-
-// Singleton cached capability info to avoid redundant round-trips
-let cachedCapabilityPromise: Promise<RealtimeCapability> | null = null;
-
-async function getRealtimeCapability(): Promise<RealtimeCapability> {
-    if (!browser) {
-        return {
-            provider: 'none',
-            ablyConfigured: false,
-            isPermanentServer: false,
-            pollingEnabled: false,
-            reason: 'Running in non-browser environment'
-        };
-    }
-    if (!cachedCapabilityPromise) {
-        cachedCapabilityPromise = (async () => {
-            try {
-                const res = await fetch('/api/realtime/info');
-                if (res.ok) {
-                    return await res.json() as RealtimeCapability;
-                }
-            } catch (err) {
-                console.warn('[Collaboration] Capability check failed, defaulting to unavailable mode:', err);
-            }
-            return {
-                provider: 'none',
-                ablyConfigured: false,
-                isPermanentServer: false,
-                pollingEnabled: false,
-                reason: 'Could not reach server capability endpoint'
-            };
-        })();
-    }
-    return cachedCapabilityPromise;
-}
-
-// Singleton browser Ably client
-let sharedRealtime: any = null;
-
-async function getAblyRealtimeClient(): Promise<any> {
-    if (!browser) return null;
-    if (!sharedRealtime) {
-        try {
-            const AblyModule = await import('ably');
-            const Ably = AblyModule.default;
-            sharedRealtime = new Ably.Realtime({
-                authUrl: '/api/ably/auth',
-                authMethod: 'GET',
-                autoConnect: true,
-                // Don't retry aggressively if auth or connection fails
-                disconnectedRetryTimeout: 10000,
-                suspendedRetryTimeout: 30000
-            });
-        } catch (err) {
-            console.warn('[Collaboration] Failed to instantiate Ably Realtime:', err);
-            return null;
-        }
-    }
-    return sharedRealtime;
+    onReconnect?: () => void;
 }
 
 export class CollaborationRoom {
@@ -96,15 +34,19 @@ export class CollaborationRoom {
     private entityId: string;
     private currentUser: UserSessionProfile;
     private changeCallbacks = new Set<(change: EntityChangeMessage) => void>();
+    private reconnectCallbacks = new Set<() => void>();
     private isDestroyed = false;
 
     // Active connection handles
     private ablyChannel: any = null;
     private ablyClient: any = null;
+    private ablyConnectionListeners: Array<{ event: string; handler: (...args: any[]) => void }> = [];
     private sseSource: EventSource | null = null;
     private sseConnectionId: string | null = null;
     private pollingInterval: ReturnType<typeof setInterval> | null = null;
     private visibilityHandler: (() => void) | null = null;
+    private onlineHandler: (() => void) | null = null;
+    private hiddenAt: number | null = null;
 
     // Svelte 5 reactive state
     peers = $state<Collaborator[]>([]);
@@ -134,10 +76,38 @@ export class CollaborationRoom {
         if (options.onRemoteChange) {
             this.changeCallbacks.add(options.onRemoteChange);
         }
+        if (options.onReconnect) {
+            this.reconnectCallbacks.add(options.onReconnect);
+        }
 
         if (browser && this.entityId) {
+            this.attachWakeRecoveryListeners();
             this.init();
         }
+    }
+
+    private attachWakeRecoveryListeners() {
+        this.hiddenAt =
+            typeof document !== 'undefined' && document.visibilityState === 'hidden' ? Date.now() : null;
+        this.visibilityHandler = () => {
+            if (typeof document === 'undefined' || this.isDestroyed) return;
+            if (document.visibilityState === 'hidden') {
+                this.hiddenAt = Date.now();
+            } else if (document.visibilityState === 'visible') {
+                const elapsed = this.hiddenAt !== null ? Date.now() - this.hiddenAt : 0;
+                this.hiddenAt = null;
+                if (elapsed >= 30_000) {
+                    this.notifyReconnectCallbacks();
+                }
+            }
+        };
+        this.onlineHandler = () => {
+            if (!this.isDestroyed) {
+                this.notifyReconnectCallbacks();
+            }
+        };
+        document.addEventListener('visibilitychange', this.visibilityHandler);
+        window.addEventListener('online', this.onlineHandler);
     }
 
     private async init() {
@@ -220,8 +190,10 @@ export class CollaborationRoom {
 
         try {
             const userColor = encodeURIComponent(JSON.stringify(getCollaboratorColor(this.currentUser.id)));
-            const sseUrl = `/api/realtime/sse?entityType=${encodeURIComponent(this.entityType)}&entityId=${encodeURIComponent(this.entityId)}&name=${encodeURIComponent(this.currentUser.name || '')}&color=${userColor}`;
+            const clientId = `${this.currentUser.id}:${getTabClientId()}`;
+            const sseUrl = `/api/realtime/sse?entityType=${encodeURIComponent(this.entityType)}&entityId=${encodeURIComponent(this.entityId)}&clientId=${encodeURIComponent(clientId)}&name=${encodeURIComponent(this.currentUser.name || '')}&color=${userColor}`;
 
+            let sseConnectedOnce = false;
             this.sseSource = new EventSource(sseUrl);
             this.provider = 'sse';
 
@@ -229,6 +201,10 @@ export class CollaborationRoom {
                 if (!this.isDestroyed) {
                     this.connected = true;
                     this.offlineReason = null;
+                    if (sseConnectedOnce) {
+                        this.notifyReconnectCallbacks();
+                    }
+                    sseConnectedOnce = true;
                 }
             };
 
@@ -262,7 +238,8 @@ export class CollaborationRoom {
             this.sseSource.addEventListener('change', (e: MessageEvent) => {
                 try {
                     const data = JSON.parse(e.data) as EntityChangeMessage;
-                    if (!data || data.updatedBy?.id === this.currentUser.id) return;
+                    if (!data) return;
+                    if (isOwnRecentMutation(this.channelName, data.originTabId)) return;
                     this.remoteChange = data;
                     this.notifyChangeCallbacks(data);
                 } catch {}
@@ -297,34 +274,53 @@ export class CollaborationRoom {
      */
     private async initAbly(): Promise<boolean> {
         try {
-            this.ablyClient = await getAblyRealtimeClient();
-            if (!this.ablyClient) return false;
+            this.ablyClient = await getSharedAblyClient();
+            if (!this.ablyClient || this.isDestroyed) return false;
 
             this.ablyChannel = this.ablyClient.channels.get(this.channelName);
 
             // Handle connection states gracefully
             this.connected = this.ablyClient.connection.state === 'connected';
             this.provider = 'ably';
+            let wasDisconnected = !this.connected && this.ablyClient.connection.state !== 'initialized' && this.ablyClient.connection.state !== 'connecting';
 
-            this.ablyClient.connection.on('connected', () => {
-                if (!this.isDestroyed) {
-                    this.connected = true;
-                    this.offlineReason = null;
+            const onConnected = () => {
+                if (this.isDestroyed) return;
+                this.connected = true;
+                this.offlineReason = null;
+                if (wasDisconnected) {
+                    wasDisconnected = false;
+                    this.notifyReconnectCallbacks();
                 }
-            });
-            this.ablyClient.connection.on('disconnected', () => {
-                if (!this.isDestroyed) {
-                    this.connected = false;
-                    this.offlineReason = 'Disconnected from Ably real-time service. Reconnecting...';
-                }
-            });
-            this.ablyClient.connection.on('failed', (err: any) => {
-                if (!this.isDestroyed) {
-                    this.connected = false;
-                    this.offlineReason = `Ably connection error: ${err?.reason?.message || 'Authentication or network failure'}`;
-                    this.cleanupAbly();
-                }
-            });
+            };
+            const onDisconnected = () => {
+                if (this.isDestroyed) return;
+                wasDisconnected = true;
+                this.connected = false;
+                this.offlineReason = 'Disconnected from Ably real-time service. Reconnecting...';
+            };
+            const onSuspended = () => {
+                if (this.isDestroyed) return;
+                wasDisconnected = true;
+                this.connected = false;
+                this.offlineReason = 'Ably connection suspended. Waiting to reconnect...';
+            };
+            const onFailed = (err: any) => {
+                if (this.isDestroyed) return;
+                this.connected = false;
+                this.offlineReason = `Ably connection error: ${err?.reason?.message || 'Authentication or network failure'}`;
+                this.cleanupAbly();
+            };
+
+            this.ablyConnectionListeners = [
+                { event: 'connected', handler: onConnected },
+                { event: 'disconnected', handler: onDisconnected },
+                { event: 'suspended', handler: onSuspended },
+                { event: 'failed', handler: onFailed }
+            ];
+            for (const { event, handler } of this.ablyConnectionListeners) {
+                this.ablyClient.connection.on(event, handler);
+            }
 
             // Subscribe to presence
             this.ablyChannel.presence.subscribe(['enter', 'leave', 'update', 'present'], async () => {
@@ -346,11 +342,11 @@ export class CollaborationRoom {
             await this.ablyChannel.presence.enter(presenceData);
             await this.refreshAblyPeers();
 
-            // Subscribe to entity updates
+            // Subscribe to entity updates (suppress only THIS tab's recent echoes, keep other tabs of same user)
             this.ablyChannel.subscribe('change', (message: any) => {
                 const data = message.data as EntityChangeMessage;
                 if (!data) return;
-                if (data.updatedBy?.id === this.currentUser.id) return;
+                if (isOwnRecentMutation(this.channelName, data.originTabId)) return;
 
                 this.remoteChange = data;
                 this.notifyChangeCallbacks(data);
@@ -435,6 +431,16 @@ export class CollaborationRoom {
         }
     }
 
+    private notifyReconnectCallbacks() {
+        for (const cb of this.reconnectCallbacks) {
+            try {
+                cb();
+            } catch (e) {
+                console.error('[Collaboration] Error in onReconnect callback:', e);
+            }
+        }
+    }
+
     /**
      * Broadcast which field the current user is focusing on
      */
@@ -485,6 +491,14 @@ export class CollaborationRoom {
     }
 
     private cleanupAbly() {
+        if (this.ablyClient && this.ablyConnectionListeners.length > 0) {
+            for (const { event, handler } of this.ablyConnectionListeners) {
+                try {
+                    this.ablyClient.connection.off(event, handler);
+                } catch {}
+            }
+            this.ablyConnectionListeners = [];
+        }
         if (this.ablyChannel) {
             try {
                 this.ablyChannel.presence.leave().catch(() => {});
@@ -513,11 +527,16 @@ export class CollaborationRoom {
             document.removeEventListener('visibilitychange', this.visibilityHandler);
             this.visibilityHandler = null;
         }
+        if (this.onlineHandler) {
+            window.removeEventListener('online', this.onlineHandler);
+            this.onlineHandler = null;
+        }
     }
 
     destroy() {
         this.isDestroyed = true;
         this.changeCallbacks.clear();
+        this.reconnectCallbacks.clear();
         this.cleanupAbly();
         this.cleanupSSE();
         this.cleanupPolling();

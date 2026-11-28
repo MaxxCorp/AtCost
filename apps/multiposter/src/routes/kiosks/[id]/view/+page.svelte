@@ -18,6 +18,7 @@
     import { invalidate, refreshAll } from "$app/navigation";
 
     import { page } from "$app/state";
+    import { subscribeRealtimeChannel } from "#lib/client/realtime/client.svelte.js";
     import { readKioskView } from "./read.remote";
 
     let kioskId = $derived(page.params.id);
@@ -307,55 +308,40 @@
         }
     }
 
-    onMount(async () => {
+    let unsubRealtimeEvents: (() => void) | null = null;
+    let unsubRealtimeAnnouncements: (() => void) | null = null;
+
+    onMount(() => {
         kioskState.isKiosk = true;
-        // Start header as visible, then hide
         showHeader();
 
-        // initCache will be called by fetchData on failure, or we can look for basic cache first
-        // await initCache();
-        // Let's rely on fetchData to drive this.
-
         if (browser) {
-            // @ts-ignore
-            import("ably")
-                .then((AblyModule) => {
-                    const Ably = AblyModule.default;
-
-                    realtime = new Ably.Realtime({ authUrl: "/api/ably/auth" });
-                    realtime.connection.on("failed", (err: any) => {
-                        console.warn("[Ably] Realtime connection not available:", err?.message || err);
-                    });
-                    const eventsChannel = realtime.channels.get("event-changes");
-                    eventsChannel.subscribe("change", (message: any) => {
-                        console.log(
-                            "Kiosk Event update received:",
-                            message.data,
-                        );
-                        refreshAll();
-                    });
-
-                    const announcementChannel = realtime.channels.get(
-                        "announcement-changes",
-                    );
-                    announcementChannel.subscribe("change", (message: any) => {
-                        console.log(
-                            "Kiosk Announcement update received:",
-                            message.data,
-                        );
-                        refreshAll();
-                    });
-                })
-                .catch((e) => console.warn("[Ably] Failed to initialize Ably:", e));
+            unsubRealtimeEvents = subscribeRealtimeChannel(
+                "event-changes",
+                () => {
+                    void refreshAll();
+                },
+                () => {
+                    void refreshAll();
+                }
+            );
+            unsubRealtimeAnnouncements = subscribeRealtimeChannel(
+                "announcement-changes",
+                () => {
+                    void refreshAll();
+                },
+                () => {
+                    void refreshAll();
+                }
+            );
         }
     });
 
     onDestroy(() => {
-        if (realtime) {
-            realtime.close();
-        }
+        unsubRealtimeEvents?.();
+        unsubRealtimeAnnouncements?.();
         kioskState.isKiosk = false;
-        kioskState.isHeaderVisible = true; // Restore for other pages
+        kioskState.isHeaderVisible = true;
         clearInterval(timer);
         clearTimeout(inactivityTimer);
     });

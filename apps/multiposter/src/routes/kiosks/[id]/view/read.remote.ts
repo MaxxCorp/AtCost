@@ -1,5 +1,5 @@
 import { query } from '$app/server';
-import { listEvents } from '../../../events/list.remote';
+import { queryEventsList } from '#lib/server/events/list-query.js';
 import { listAnnouncements } from '../../../announcements/list.remote';
 import { db } from '@ac/db';
 import { kiosk, kioskLocation } from '@ac/db';
@@ -163,7 +163,7 @@ export const readKioskView = query(v.string(), async (kioskId) => {
 
         const effectiveExcludeNonPublic = !isAuthorized || Boolean(kioskData.excludeNonPublic);
 
-        const eventsResult = await listEvents({
+        const eventsResult = await queryEventsList({
             limit: 250,
             locationId: locationIds.length > 0 ? locationIds : undefined,
             startDate,
