@@ -299,3 +299,62 @@ export const DEFAULT_PRESETS: CiPreset[] = [
         sponsors: []
     }
 ];
+
+export interface TopTriangleOrgLogoLayout {
+    marginMm: number;
+    circleDiameterMm: number;
+    imgHeightMm: number;
+    imgTopMm: number;
+    translateXPercent: number;
+}
+
+/** Pixel geometry of static/logos/org-ball.png (1024x689) used to center its circle exactly. */
+export const BALL_ORG_LOGO_METRICS = {
+    widthPx: 1024,
+    heightPx: 689,
+    centerXRatio: 341 / 1024,
+    topRatio: 6 / 689,
+    diameterRatio: 672 / 689
+} as const;
+
+/**
+ * Computes exact mm placement for the top-center org logo inside the upper CI triangle
+ * so the logo's circle center lies at 50% width with equal slim margins to the top edge
+ * and the hypotenuse stroke below.
+ */
+export function computeTopTriangleOrgLogoLayout(params: {
+    widthMm: number;
+    heightMm: number;
+    isBallLogo: boolean;
+    marginMm?: number;
+    strokeHalfWidthMm?: number;
+}): TopTriangleOrgLogoLayout {
+    const { widthMm, heightMm, isBallLogo } = params;
+    const strokeHalfWidthMm = params.strokeHalfWidthMm ?? 0.26;
+    const marginMm = params.marginMm ?? Math.max(1.2, Math.round(heightMm * 0.045 * 10) / 10);
+    const cosTheta = widthMm / Math.hypot(widthMm, heightMm);
+    const circleDiameterMm = Math.max(
+        4,
+        (heightMm * cosTheta - 2 * strokeHalfWidthMm) / (1 + cosTheta) - 2 * marginMm
+    );
+
+    if (isBallLogo) {
+        const imgHeightMm = circleDiameterMm / BALL_ORG_LOGO_METRICS.diameterRatio;
+        const imgTopMm = marginMm - imgHeightMm * BALL_ORG_LOGO_METRICS.topRatio;
+        return {
+            marginMm,
+            circleDiameterMm,
+            imgHeightMm,
+            imgTopMm,
+            translateXPercent: -(BALL_ORG_LOGO_METRICS.centerXRatio * 100)
+        };
+    }
+
+    return {
+        marginMm,
+        circleDiameterMm,
+        imgHeightMm: circleDiameterMm,
+        imgTopMm: marginMm,
+        translateXPercent: -50
+    };
+}

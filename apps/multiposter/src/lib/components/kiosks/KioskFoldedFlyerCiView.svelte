@@ -1047,6 +1047,7 @@
                                         locationName={loc.name}
                                         customLocationLogo={ciPreset.locationLogoUrl || loc.heroImage}
                                         customOrgLogo={ciPreset.orgLogoUrl}
+                                        widthMm={99}
                                         heightMm={34}
                                         variant="flyer"
                                     />

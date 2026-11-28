@@ -1515,6 +1515,7 @@
                     locationName={currentLocation?.name || kiosk?.name}
                     customLocationLogo={effectiveLocationLogo}
                     customOrgLogo={ciPreset.orgLogoUrl}
+                    widthMm={paperSize === 'A3' ? 297 : 210}
                     heightMm={paperSize === 'A3' ? 52 : 44}
                     variant="poster"
                     selectedCardId={selectedCardId}

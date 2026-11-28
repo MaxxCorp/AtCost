@@ -1,5 +1,12 @@
 <script lang="ts">
-    import { getCardPrintClasses, type CiPreset, type PrintMode, type CardPrintConfig, type KioskElementSettings } from "./types.js";
+    import {
+        computeTopTriangleOrgLogoLayout,
+        getCardPrintClasses,
+        type CiPreset,
+        type PrintMode,
+        type CardPrintConfig,
+        type KioskElementSettings
+    } from "./types.js";
 
     let {
         preset,
@@ -9,6 +16,7 @@
         customOrgLogo = "",
         showLocationTitle = false,
         heightMm: explicitHeightMm,
+        widthMm: explicitWidthMm,
         variant = "auto",
         class: extraClass = "",
         selectedCardId = null,
@@ -24,6 +32,7 @@
         customOrgLogo?: string | null;
         showLocationTitle?: boolean;
         heightMm?: number;
+        widthMm?: number;
         variant?: "auto" | "flyer" | "poster";
         class?: string;
         selectedCardId?: string | null;
@@ -42,6 +51,15 @@
     let heightMm = $derived(explicitHeightMm || preset.topHeightMm || 36);
     let isPoster = $derived(variant === "poster" || (variant === "auto" && heightMm >= 40));
     let isA3 = $derived(isPoster && heightMm >= 50);
+    let effectiveWidthMm = $derived(explicitWidthMm || (isA3 ? 297 : isPoster ? 210 : 99));
+    let isBallLogo = $derived(effectiveOrgLogo.toLowerCase().includes("org-ball.png"));
+    let orgLogoLayout = $derived(
+        computeTopTriangleOrgLogoLayout({
+            widthMm: effectiveWidthMm,
+            heightMm,
+            isBallLogo
+        })
+    );
 </script>
 
 <div
@@ -129,24 +147,25 @@
             </div>
         {/if}
 
-        <!-- Zone 2: Org Logo (BALL e.V.), horizontally positioned in upper triangle wedge -->
+        <!-- Zone 2: Org Logo (BALL e.V.), circle centered at 50% width with equal slim margins to top and hypotenuse -->
         {#if preset.showOrgLogo && effectiveOrgLogo}
             <div
-                class="absolute {isPoster ? 'left-[38%] sm:left-[40%]' : 'left-[45%] sm:left-[46%]'} top-[3%] flex items-start justify-start"
-                style="max-width: {isPoster ? '25%' : '22%'};"
+                class="absolute left-1/2"
+                style="top: {orgLogoLayout.imgTopMm}mm; transform: translateX({orgLogoLayout.translateXPercent}%);"
             >
                 <div
                     role="button"
                     tabindex="0"
                     onclick={(e) => { e.stopPropagation(); onSelect?.('org_logo'); }}
                     onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onSelect?.('org_logo'); } }}
-                    class="transition-all rounded-sm p-0.5 outline-hidden {onSelect ? 'cursor-pointer hover:ring-1 hover:ring-amber-300/70' : ''} {selectedCardId === 'org_logo' ? 'ring-2 ring-amber-400 bg-amber-500/10 print:ring-0 print:bg-transparent' : ''} {getCardPrintClasses(cardSettings?.['org_logo'], elementSettings?.header, previewGreyscaleOnScreen)}"
+                    class="inline-block transition-all rounded-sm p-0 outline-hidden {onSelect ? 'cursor-pointer hover:ring-1 hover:ring-amber-300/70 hover:ring-offset-1' : ''} {selectedCardId === 'org_logo' ? 'ring-2 ring-amber-400 ring-offset-1 bg-amber-500/10 print:ring-0 print:bg-transparent' : ''} {getCardPrintClasses(cardSettings?.['org_logo'], elementSettings?.header, previewGreyscaleOnScreen)}"
                     title="Organisationslogo (Klicken für Druck- & Farbeinstellungen)"
                 >
                     <img
                         src={effectiveOrgLogo}
                         alt="Organisation Logo"
-                        class="{isA3 ? 'h-[20mm] max-h-[78px] max-w-[150px]' : isPoster ? 'h-[17mm] max-h-[66px] max-w-[130px]' : 'h-[11mm] max-h-[44px] max-w-[85px]'} w-auto object-contain object-left-top"
+                        class="block w-auto max-w-none max-h-none object-contain"
+                        style="height: {orgLogoLayout.imgHeightMm}mm;"
                     />
                 </div>
             </div>
